@@ -1,0 +1,5 @@
+extends: base.yaml
+
+training:
+  enabled: false
+  note: Placeholder for a later metric-learning stage once labeled query data exists.

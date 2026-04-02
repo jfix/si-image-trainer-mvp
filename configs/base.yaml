@@ -1,0 +1,28 @@
+paths:
+  reference_root: /Users/jakob/Projects/si-reference-library/references
+  live_root: /Users/jakob/Projects/collect-si-live-data/images
+  live_data_root: /Users/jakob/Projects/collect-si-live-data/data
+  place_mappings: /Users/jakob/Projects/collect-si-live-data/place-mappings.json
+  reference_manifest: data/processed/reference_manifest.jsonl
+  query_manifest: data/processed/query_manifest.jsonl
+  eval_manifest: data/processed/eval_queries.jsonl
+  index_dir: outputs/indexes
+  report_dir: outputs/reports
+
+embedding:
+  image_size: 96
+  color_bins: 12
+  edge_bins: 16
+  gradient_size: 24
+
+retrieval:
+  top_n: 12
+  rerank_m: 5
+  aggregate_method: max_mean
+
+confidence:
+  certainly_score: 0.94
+  probably_score: 0.88
+  maybe_score: 0.80
+  unknown_score: 0.72
+  margin_threshold: 0.035

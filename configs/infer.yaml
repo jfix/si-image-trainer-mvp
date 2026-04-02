@@ -1,0 +1,5 @@
+extends: base.yaml
+
+retrieval:
+  top_n: 10
+  rerank_m: 5
