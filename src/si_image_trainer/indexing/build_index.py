@@ -29,7 +29,8 @@ def build_indexes(
         vectors = np.vstack([embedder.embed_path(row["image_path"]) for row in group]).astype(np.float32)
         city_dir = output_root / city_code
         ensure_parent(city_dir / "placeholder")
+        np.save(city_dir / "embeddings.npy", vectors)
         np.savez_compressed(city_dir / "index.npz", embeddings=vectors)
         (city_dir / "metadata.json").write_text(json.dumps(group, indent=2) + "\n", encoding="utf-8")
-        manifests.append({"city_code": city_code, "count": len(group), "path": str(city_dir / "index.npz")})
+        manifests.append({"city_code": city_code, "count": len(group), "path": str(city_dir / "embeddings.npy")})
     return manifests

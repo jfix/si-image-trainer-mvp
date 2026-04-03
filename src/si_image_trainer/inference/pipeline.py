@@ -18,14 +18,30 @@ class RetrievalPipeline:
         self.embedder = BaselineEmbedder(**embedding_config)
         self.retrieval_config = retrieval_config
         self.confidence_config = confidence_config
+        self._city_cache: dict[str, tuple[np.ndarray, list[dict[str, Any]]]] = {}
 
     def _load_city_index(self, city_code: str) -> tuple[np.ndarray, list[dict[str, Any]]]:
+        cached = self._city_cache.get(city_code)
+        if cached is not None:
+            return cached
+
         city_dir = self.index_dir / city_code
-        if not (city_dir / "index.npz").exists():
+        embeddings_path = city_dir / "embeddings.npy"
+        legacy_path = city_dir / "index.npz"
+        metadata_path = city_dir / "metadata.json"
+
+        if not embeddings_path.exists() and not legacy_path.exists():
             raise FileNotFoundError(f"No index available for city_code={city_code}")
-        payload = np.load(city_dir / "index.npz")
-        metadata = json.loads((city_dir / "metadata.json").read_text(encoding="utf-8"))
-        return payload["embeddings"], metadata
+        if embeddings_path.exists():
+            matrix = np.load(embeddings_path, mmap_mode="r")
+        else:
+            payload = np.load(legacy_path)
+            matrix = payload["embeddings"]
+
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        loaded = (matrix, metadata)
+        self._city_cache[city_code] = loaded
+        return loaded
 
     def predict(self, image_path: str, city_code: str) -> dict[str, Any]:
         try:

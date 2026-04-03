@@ -81,3 +81,7 @@ def main() -> None:
         print(json.dumps(train_metric(config), indent=2))
         return
     raise ValueError(f"Unsupported command: {args.command}")
+
+
+if __name__ == "__main__":
+    main()
