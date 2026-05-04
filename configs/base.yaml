@@ -21,6 +21,8 @@ retrieval:
   aggregate_method: max_mean
   stage1_allowed_roles:
     - reference
+    - flash-reference
+    - grosplan
   role_weights:
     reference: 1.0
     flash-reference: 0.92

@@ -41,3 +41,37 @@ class BaselineEmbedder:
 
         features = np.concatenate([*color_features, edge_hist.astype(np.float32), pooled.astype(np.float32)])
         return normalize_vector(features.astype(np.float32))
+
+
+class PretrainedEmbedder:
+    def __init__(self, model_name: str = "facebook/dinov2-small") -> None:
+        import torch
+        from transformers import AutoImageProcessor, AutoModel
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._processor = AutoImageProcessor.from_pretrained(model_name)
+        self._model = AutoModel.from_pretrained(model_name)
+        self._model.eval()
+        self._model.to(self._device)
+        self._torch = torch
+
+    def embed_path(self, image_path: str) -> np.ndarray:
+        return self.embed_image(open_image(image_path))
+
+    def embed_image(self, image) -> np.ndarray:
+        inputs = self._processor(images=image, return_tensors="pt")
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
+        with self._torch.no_grad():
+            outputs = self._model(**inputs)
+        cls_token = outputs.last_hidden_state[:, 0].squeeze()
+        return normalize_vector(cls_token.cpu().numpy().astype(np.float32))
+
+
+def make_embedder(config: dict) -> BaselineEmbedder | PretrainedEmbedder:
+    if config.get("type") == "pretrained":
+        return PretrainedEmbedder(model_name=config.get("model_name", "dinov2_vits14"))
+    return BaselineEmbedder(
+        image_size=config.get("image_size", 96),
+        color_bins=config.get("color_bins", 12),
+        edge_bins=config.get("edge_bins", 16),
+        gradient_size=config.get("gradient_size", 24),
+    )

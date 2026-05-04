@@ -13,6 +13,7 @@ dependencies = [
   "Pillow>=10.0",
   "PyYAML>=6.0",
   "ultralytics>=8.4",
+  "transformers>=4.40",
 ]
 
 [project.scripts]
