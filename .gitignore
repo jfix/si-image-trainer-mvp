@@ -4,6 +4,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 .python-version
+*.egg-info/
+
+*.pt
+
+runs/
 
 data/raw/*
 !data/raw/.gitkeep
@@ -11,6 +16,7 @@ data/interim/*
 !data/interim/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+data/detector/
 
 outputs/models/*
 !outputs/models/.gitkeep

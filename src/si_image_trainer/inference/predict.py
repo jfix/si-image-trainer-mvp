@@ -25,6 +25,7 @@ def predict_one(config: dict[str, Any], image_path: str, city_code: str) -> dict
             embedding_config=config["embedding"],
             retrieval_config=config["retrieval"],
             confidence_config=config["confidence"],
+            detector_config=config.get("detector"),
         )
         _PIPELINE_CACHE[cache_key] = pipeline
     return pipeline.predict(image_path=image_path, city_code=city_code)

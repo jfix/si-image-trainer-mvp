@@ -19,6 +19,13 @@ retrieval:
   top_n: 12
   rerank_m: 5
   aggregate_method: max_mean
+  stage1_allowed_roles:
+    - reference
+  role_weights:
+    reference: 1.0
+    flash-reference: 0.92
+    grosplan: 0.82
+    status-empty-scene: 0.4
 
 confidence:
   certainly_score: 0.94
@@ -26,3 +33,7 @@ confidence:
   maybe_score: 0.80
   unknown_score: 0.72
   margin_threshold: 0.035
+
+detector:
+  model_path: outputs/models/mosaic_detector_v3.pt
+  conf: 0.25

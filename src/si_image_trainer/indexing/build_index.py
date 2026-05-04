@@ -13,11 +13,17 @@ def build_indexes(
     reference_manifest_path: str | Path,
     output_dir: str | Path,
     embedding_config: dict[str, int],
+    retrieval_config: dict[str, object] | None = None,
     exclude_manifest_path: str | Path | None = None,
 ) -> list[dict[str, object]]:
     rows = read_jsonl(reference_manifest_path)
     excluded = {row["image_path"] for row in read_jsonl(exclude_manifest_path)} if exclude_manifest_path else set()
     rows = [row for row in rows if row["image_path"] not in excluded]
+    allowed_roles = {
+        str(role)
+        for role in (retrieval_config or {}).get("stage1_allowed_roles", ["reference", "flash-reference"])
+    }
+    rows = [row for row in rows if str(row.get("role", "reference")) in allowed_roles]
     output_root = Path(output_dir)
     embedder = BaselineEmbedder(**embedding_config)
     grouped: dict[str, list[dict[str, str]]] = {}

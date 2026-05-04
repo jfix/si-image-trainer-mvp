@@ -9,15 +9,17 @@ import numpy as np
 from si_image_trainer.indexing.aggregate import aggregate_hits
 from si_image_trainer.indexing.search import top_k_search
 from si_image_trainer.models.calibrator import label_confidence
+from si_image_trainer.models.detector import MosaicDetector
 from si_image_trainer.models.embedder import BaselineEmbedder
 
 
 class RetrievalPipeline:
-    def __init__(self, index_dir: str | Path, embedding_config: dict[str, int], retrieval_config: dict[str, Any], confidence_config: dict[str, float]) -> None:
+    def __init__(self, index_dir: str | Path, embedding_config: dict[str, int], retrieval_config: dict[str, Any], confidence_config: dict[str, float], detector_config: dict[str, Any] | None = None) -> None:
         self.index_dir = Path(index_dir)
         self.embedder = BaselineEmbedder(**embedding_config)
         self.retrieval_config = retrieval_config
         self.confidence_config = confidence_config
+        self.detector = MosaicDetector(**detector_config) if detector_config else None
         self._city_cache: dict[str, tuple[np.ndarray, list[dict[str, Any]]]] = {}
 
     def _load_city_index(self, city_code: str) -> tuple[np.ndarray, list[dict[str, Any]]]:
@@ -55,7 +57,11 @@ class RetrievalPipeline:
                 "confidence_label": "unknown",
                 "diagnostics": {"reason": str(exc), "top_score": 0.0, "margin_to_second": 0.0, "raw_hits": []},
             }
-        query = self.embedder.embed_path(image_path)
+        crop = self.detector.crop(image_path) if self.detector else None
+        if crop is not None:
+            query = self.embedder.embed_image(crop)
+        else:
+            query = self.embedder.embed_path(image_path)
         indices, scores = top_k_search(query, matrix, int(self.retrieval_config["top_n"]))
         hits: list[dict[str, Any]] = []
         for index, score in zip(indices.tolist(), scores.tolist()):
@@ -63,7 +69,7 @@ class RetrievalPipeline:
             hit["score"] = round(float(score), 6)
             hits.append(hit)
 
-        candidates = aggregate_hits(hits)[: int(self.retrieval_config["rerank_m"])]
+        candidates = aggregate_hits(hits, self.retrieval_config.get("role_weights"))[: int(self.retrieval_config["rerank_m"])]
         top_candidate = candidates[0] if candidates else None
         next_score = float(candidates[1]["aggregate_score"]) if len(candidates) > 1 else 0.0
         top_score = float(top_candidate["aggregate_score"]) if top_candidate else 0.0
@@ -86,6 +92,7 @@ class RetrievalPipeline:
             "diagnostics": {
                 "top_score": round(top_score, 6),
                 "margin_to_second": round(margin, 6),
+                "used_crop": crop is not None,
                 "raw_hits": hits[:5],
             },
         }

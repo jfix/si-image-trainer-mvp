@@ -59,6 +59,7 @@ def main() -> None:
             config["paths"]["reference_manifest"],
             config["paths"]["index_dir"],
             config["embedding"],
+            config.get("retrieval"),
             exclude_manifest_path=config["paths"].get("eval_manifest"),
         )
         print(json.dumps(rows, indent=2))
