@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from si_image_trainer.models.embedder import BaselineEmbedder
+from si_image_trainer.models.embedder import make_embedder
 from si_image_trainer.utils.io import ensure_parent, read_jsonl
 
 
@@ -25,7 +25,7 @@ def build_indexes(
     }
     rows = [row for row in rows if str(row.get("role", "reference")) in allowed_roles]
     output_root = Path(output_dir)
-    embedder = BaselineEmbedder(**embedding_config)
+    embedder = make_embedder(embedding_config)
     grouped: dict[str, list[dict[str, str]]] = {}
     for row in rows:
         grouped.setdefault(row["city_code"], []).append(row)

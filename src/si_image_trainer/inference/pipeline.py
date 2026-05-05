@@ -10,13 +10,13 @@ from si_image_trainer.indexing.aggregate import aggregate_hits
 from si_image_trainer.indexing.search import top_k_search
 from si_image_trainer.models.calibrator import label_confidence
 from si_image_trainer.models.detector import MosaicDetector
-from si_image_trainer.models.embedder import BaselineEmbedder
+from si_image_trainer.models.embedder import make_embedder
 
 
 class RetrievalPipeline:
     def __init__(self, index_dir: str | Path, embedding_config: dict[str, int], retrieval_config: dict[str, Any], confidence_config: dict[str, float], detector_config: dict[str, Any] | None = None) -> None:
         self.index_dir = Path(index_dir)
-        self.embedder = BaselineEmbedder(**embedding_config)
+        self.embedder = make_embedder(embedding_config)
         self.retrieval_config = retrieval_config
         self.confidence_config = confidence_config
         self.detector = MosaicDetector(**detector_config) if detector_config else None

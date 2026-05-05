@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import albumentations as A
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
@@ -13,12 +15,32 @@ from transformers import AutoImageProcessor, AutoModel
 from si_image_trainer.utils.image import open_image
 from si_image_trainer.utils.io import read_jsonl
 
+# Aggressive augmentation applied to the anchor — simulates flash photo conditions:
+# variable lighting, motion blur, perspective distortion, distance variation.
+_FLASH_AUGMENT = A.Compose([
+    A.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.4, hue=0.1, p=0.9),
+    A.GaussianBlur(blur_limit=(3, 7), sigma_limit=(0.5, 3.0), p=0.6),
+    A.Perspective(scale=(0.05, 0.15), p=0.5),
+    A.Affine(rotate=(-20, 20), translate_percent=(-0.1, 0.1), scale=(0.75, 1.25), p=0.6),
+    A.RandomBrightnessContrast(p=0.4),
+    A.Sharpen(alpha=(0, 0.5), lightness=(0.5, 1.0), p=0.3),
+    A.ToGray(p=0.05),
+    A.ImageCompression(quality_range=(60, 95), p=0.3),
+])
+
+# Light augmentation applied to the positive — adds variety without heavy distortion.
+_LIGHT_AUGMENT = A.Compose([
+    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05, p=0.5),
+    A.RandomBrightnessContrast(p=0.2),
+])
+
 
 class TripletDataset(Dataset):
-    def __init__(self, invader_images: dict[str, list[str]], processor, triplets_per_invader: int = 4) -> None:
+    def __init__(self, invader_images: dict[str, list[str]], processor, triplets_per_invader: int = 4, augment: bool = False) -> None:
         self._by_id = {k: v for k, v in invader_images.items() if len(v) >= 2}
         self._ids = list(self._by_id.keys())
         self._processor = processor
+        self._augment = augment
         self._length = len(self._ids) * triplets_per_invader
 
     def __len__(self) -> int:
@@ -30,10 +52,14 @@ class TripletDataset(Dataset):
         neg_id = random.choice([i for i in self._ids if i != anchor_id])
         neg_path = random.choice(self._by_id[neg_id])
 
-        def load(path: str) -> torch.Tensor:
+        def load(path: str, aug=None) -> torch.Tensor:
             img = open_image(path)
+            if aug is not None:
+                img = aug(image=np.array(img))["image"]
             return self._processor(images=img, return_tensors="pt")["pixel_values"].squeeze(0)
 
+        if self._augment:
+            return load(anchor_path, _FLASH_AUGMENT), load(pos_path, _LIGHT_AUGMENT), load(neg_path)
         return load(anchor_path), load(pos_path), load(neg_path)
 
 
@@ -100,8 +126,10 @@ def train_metric(config: dict[str, Any]) -> dict[str, Any]:
 
     model.to(device)
 
-    train_ds = TripletDataset(train_inv, processor)
-    val_ds = TripletDataset(val_inv, processor, triplets_per_invader=8)
+    augment = bool(train_cfg.get("augment", True))
+    print(f"Augmentation: {'on' if augment else 'off'}")
+    train_ds = TripletDataset(train_inv, processor, augment=augment)
+    val_ds = TripletDataset(val_inv, processor, triplets_per_invader=8, augment=False)
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
 

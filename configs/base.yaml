@@ -40,9 +40,10 @@ detector:
 
 training:
   model_name: facebook/dinov2-small
-  output_dir: outputs/models/dinov2_finetuned
+  output_dir: outputs/models/dinov2_finetuned_aug
   epochs: 20
   batch_size: 16
   lr: 1.0e-5
   margin: 0.3
   unfreeze_last_n_blocks: 2
+  augment: true
