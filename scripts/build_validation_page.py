@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import io
 import json
 import random
 import sys
@@ -12,10 +13,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from si_image_trainer.inference.predict import predict_one
+from si_image_trainer.models.detector import MosaicDetector
 from si_image_trainer.utils.io import load_yaml
 
 
 REFERENCE_ROOT = Path("/Users/jakob/Projects/si-reference-library/references")
+
+
+def pil_to_b64(img) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    data = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/jpeg;base64,{data}"
 
 
 def img_to_b64(path: str | Path) -> str | None:
@@ -44,6 +53,7 @@ def best_reference_image(invader_id: str) -> Path | None:
 
 
 def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
+    detector = MosaicDetector(**config["detector"]) if config.get("detector") else None
     print(f"Running predictions on {len(queries)} images...")
     results = []
     for i, q in enumerate(queries, 1):
@@ -51,10 +61,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
         pred = predict_one(config, q["image_path"], q["city_code"])
         invader_id = pred.get("prediction")
         ref_path = best_reference_image(invader_id) if invader_id else None
+        crop = detector.crop(q["image_path"]) if detector else None
         results.append({
             "query": q,
             "pred": pred,
             "flash_b64": img_to_b64(q["image_path"]),
+            "crop_b64": pil_to_b64(crop) if crop else None,
             "ref_b64": img_to_b64(ref_path) if ref_path else None,
             "ref_path": str(ref_path) if ref_path else None,
         })
@@ -81,6 +93,11 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
             if r["flash_b64"]
             else '<div class="no-img">no image</div>'
         )
+        crop_img = (
+            f'<img src="{r["crop_b64"]}" alt="crop">'
+            if r.get("crop_b64")
+            else '<div class="no-img">no crop</div>'
+        )
         ref_img = (
             f'<img src="{r["ref_b64"]}" alt="reference">'
             if r["ref_b64"]
@@ -98,8 +115,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
           </div>
           <div class="images">
             <div class="img-block">
-              <div class="label">Flash{' (cropped)' if used_crop else ''}</div>
+              <div class="label">Flash</div>
               {flash_img}
+            </div>
+            <div class="img-block">
+              <div class="label">Crop used for matching</div>
+              {crop_img}
             </div>
             <div class="img-block">
               <div class="label">Reference: {invader_id}</div>
@@ -191,6 +212,7 @@ def main() -> None:
 
     config = load_yaml(args.config)
     queries = [json.loads(l) for l in open(config["paths"]["query_manifest"])]
+    queries = [q for q in queries if q.get("city_code")]
     if args.city:
         queries = [q for q in queries if q["city_code"] == args.city]
 

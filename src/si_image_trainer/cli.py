@@ -61,6 +61,7 @@ def main() -> None:
             config["embedding"],
             config.get("retrieval"),
             exclude_manifest_path=config["paths"].get("eval_manifest"),
+            detector_config=config.get("detector"),
         )
         print(json.dumps(rows, indent=2))
         return

@@ -55,12 +55,15 @@ Retrieval-based pipeline:
 
 ---
 
-### 5. DINOv2 fine-tuned with triplet loss + augmentation (in progress)
+### 5. DINOv2 fine-tuned with triplet loss + augmentation
 **What:** Same as experiment 4 but the anchor image gets heavy augmentation simulating flash photo conditions: colour jitter, gaussian blur, perspective distortion, affine transform, JPEG compression. Positive gets light augmentation. Negative is clean.  
 **Augmentation library:** `albumentations` (faster than torchvision for geometric transforms).  
-**Training:** Running on Google Colab T4 GPU (~9 min/epoch). Split across two 90-min sessions (epochs 1–10, then 11–20).  
-**Progress so far:** epoch 7 best, val loss 0.1181 and still improving.  
-**Weights (when done):** `outputs/models/dinov2_finetuned_aug/`
+**Training:** Google Colab T4 GPU, 20 epochs in one session (~9 min/epoch). Best epoch: 19, val loss 0.0963.  
+**Flash accuracy (full reference images in index):** ~0% — model trained but inference still broken.  
+**Flash accuracy (cropped reference images in index):** **~23% (7/30 manual validation)** — major improvement.  
+**Key finding:** The model was always learning something useful. The problem was an asymmetry: flash images were cropped to the mosaic region at inference, but reference images in the index were embedded as full photos. Fixing `build_index.py` to also run the detector on reference images and embed the crop eliminated this mismatch and unlocked the accuracy.  
+**Weights:** `outputs/models/dinov2_finetuned_aug/`  
+**Next:** Retrain with cropped reference images as positives/negatives (not full images) to close the remaining training/inference gap.
 
 ---
 
@@ -102,9 +105,10 @@ These will need recalibrating again after the augmented model is trained, since 
 ## What to try next
 
 ### High priority
-- [ ] **Evaluate augmented model on flash images** — once Colab run finishes, rebuild index and regenerate validation page. This is the key test.
+- [x] **Evaluate augmented model on flash images** — done, ~23% on manual validation of 30 PA images.
+- [ ] **Retrain with cropped reference images** — update Colab notebook so positives/negatives are also detector-cropped before embedding. This closes the training/inference gap that still exists.
 - [ ] **Build a labeled flash dataset** — manually identify ~50 flash images with known invader IDs. Essential for honest accuracy measurement and future training.
-- [ ] **Recalibrate confidence thresholds** — after augmented model is trained.
+- [ ] **Recalibrate confidence thresholds** — after next model is trained.
 
 ### Medium priority
 - [ ] **Include labeled flash images in training** — once the labeled flash dataset exists, add (flash image, reference image) pairs as positive triplets. This directly teaches the flash↔reference mapping rather than relying on augmentation alone.
