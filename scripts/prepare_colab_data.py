@@ -37,6 +37,13 @@ def main() -> None:
         manifest_content = "\n".join(json.dumps(r) for r in remapped)
         zf.writestr("reference_manifest.jsonl", manifest_content)
 
+        detector_path = Path("outputs/models/mosaic_detector_v3.pt")
+        if detector_path.exists():
+            zf.write(detector_path, arcname="mosaic_detector_v3.pt")
+            print(f"\nAdded detector weights ({detector_path.stat().st_size / 1_000_000:.1f} MB)")
+        else:
+            print("\nWarning: detector weights not found, skipping")
+
     size_mb = OUTPUT_ZIP.stat().st_size / 1_000_000
     print(f"\nWrote {OUTPUT_ZIP}  ({size_mb:.0f} MB)  — {total} images")
 
