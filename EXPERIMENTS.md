@@ -67,6 +67,17 @@ Retrieval-based pipeline:
 
 ---
 
+### 6. DINOv2 fine-tuned with crop triplets (crop both sides)
+**What:** Same augmentation as experiment 5, but reference images are also detector-cropped before embedding — both at index time and during training (all three legs of each triplet use the crop if found, falling back to full image). Starts from bare DINOv2-small, not from the previous fine-tuned model.  
+**Training:** Google Colab T4 GPU, 20 epochs (~285s/epoch). Best epoch: 14, val loss 0.1249.  
+**Val loss higher than exp 5** (0.1249 vs 0.0963) — expected, task is harder with variable crop sizes.  
+**Flash accuracy:** ~30% (9/30) on one sample, ~43% (13/30) on a second independent sample. Real accuracy likely 35–40% on PA.  
+**Key finding:** Crop-to-crop training further improved over the asymmetric model. PA is still hard (1700+ mosaics) but results are meaningful with no labeled flash data at all.  
+**Weights:** `outputs/models/dinov2_finetuned_aug_crop/`  
+**Next:** Try warm-starting from `dinov2_finetuned_aug` instead of bare DINOv2, and/or add labeled flash images to training.
+
+---
+
 ## Confidence calibration
 
 After fine-tuning without augmentation, recalibrated confidence thresholds to match the new score range (0.45–0.67 vs old 0.72–0.94):
@@ -106,7 +117,8 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ### High priority
 - [x] **Evaluate augmented model on flash images** — done, ~23% on manual validation of 30 PA images.
-- [ ] **Retrain with cropped reference images** — update Colab notebook so positives/negatives are also detector-cropped before embedding. This closes the training/inference gap that still exists.
+- [x] **Retrain with cropped reference images** — done, see experiment 6. Improved to ~30–43% on PA.
+- [ ] **Warm start from `dinov2_finetuned_aug`** — try fine-tuning the aug model further on crop triplets instead of starting from bare DINOv2. Should converge faster and potentially better.
 - [ ] **Build a labeled flash dataset** — manually identify ~50 flash images with known invader IDs. Essential for honest accuracy measurement and future training.
 - [ ] **Recalibrate confidence thresholds** — after next model is trained.
 
