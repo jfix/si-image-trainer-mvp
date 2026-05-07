@@ -16,6 +16,7 @@ data/interim/*
 !data/interim/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/flash_labels.jsonl
 data/detector/
 
 outputs/models/*

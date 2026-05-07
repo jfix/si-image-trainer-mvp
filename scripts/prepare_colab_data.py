@@ -6,8 +6,9 @@ import sys
 import zipfile
 from pathlib import Path
 
-MANIFEST = Path("data/processed/reference_manifest.jsonl")
-OUTPUT_ZIP = Path("outputs/colab_training_data.zip")
+MANIFEST      = Path("data/processed/reference_manifest.jsonl")
+FLASH_LABELS  = Path("data/processed/flash_labels.jsonl")
+OUTPUT_ZIP    = Path("outputs/colab_training_data.zip")
 
 
 def main() -> None:
@@ -37,12 +38,31 @@ def main() -> None:
         manifest_content = "\n".join(json.dumps(r) for r in remapped)
         zf.writestr("reference_manifest.jsonl", manifest_content)
 
+        # Labeled flash images
+        if FLASH_LABELS.exists():
+            flash_rows = [json.loads(l) for l in FLASH_LABELS.read_text().splitlines() if l.strip()]
+            flash_remapped = []
+            missing_flash = 0
+            for r in flash_rows:
+                p = Path(r["image_path"])
+                if not p.exists():
+                    missing_flash += 1
+                    continue
+                rel = f"flash/{p.name}"
+                zf.write(str(p), arcname=f"flash_images/{rel}")
+                flash_remapped.append({**r, "image_path": rel})
+            flash_manifest = "\n".join(json.dumps(r) for r in flash_remapped)
+            zf.writestr("flash_labels.jsonl", flash_manifest)
+            print(f"\nAdded {len(flash_remapped)} labeled flash images ({missing_flash} missing)")
+        else:
+            print("\nNo flash_labels.jsonl found, skipping")
+
         detector_path = Path("outputs/models/mosaic_detector_v3.pt")
         if detector_path.exists():
             zf.write(detector_path, arcname="mosaic_detector_v3.pt")
-            print(f"\nAdded detector weights ({detector_path.stat().st_size / 1_000_000:.1f} MB)")
+            print(f"Added detector weights ({detector_path.stat().st_size / 1_000_000:.1f} MB)")
         else:
-            print("\nWarning: detector weights not found, skipping")
+            print("Warning: detector weights not found, skipping")
 
     size_mb = OUTPUT_ZIP.stat().st_size / 1_000_000
     print(f"\nWrote {OUTPUT_ZIP}  ({size_mb:.0f} MB)  — {total} images")
