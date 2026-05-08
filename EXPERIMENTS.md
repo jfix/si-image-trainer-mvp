@@ -89,6 +89,21 @@ Retrieval-based pipeline:
 
 ---
 
+### 8. Cross-city generalisation test
+**What:** Tested experiment 7 model (trained exclusively on PA data) on London and Brussels flash images with no city-specific labeled data or fine-tuning.  
+**Results:**
+
+| City | Approx. mosaics in index | Accuracy (20 images) |
+|------|--------------------------|----------------------|
+| PA   | ~1700                    | ~50%                 |
+| LDN  | ~600                     | 60%                  |
+| BXL  | ~200                     | 55%                  |
+
+**Key finding:** The model generalises across cities without any city-specific training. Smaller indexes perform better — fewer candidates means less competition. The system is usable today for smaller cities as-is.  
+**Next:** More PA labeled data will improve PA accuracy and likely lift other cities too via better general embeddings.
+
+---
+
 ## Confidence calibration
 
 After fine-tuning without augmentation, recalibrated confidence thresholds to match the new score range (0.45–0.67 vs old 0.72–0.94):
