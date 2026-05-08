@@ -89,6 +89,18 @@ Retrieval-based pipeline:
 
 ---
 
+### 9. DINOv2 fine-tuned with 291 labeled flash images across 4 cities — 2026-05-08
+**What:** Same architecture as experiment 7, but labeled dataset grows from 52 → 291 images across PA (107), LDN (88), MARS (47), BXL (49). ~248 flash pairs used for training after val split. FLASH_OVERSAMPLE=20 → ~4960 flash triplets per epoch (~5× more than exp 7).  
+**Training:** Google Colab T4 GPU, 20 epochs (~370s/epoch). Best epoch: 20 (val loss still improving — more epochs helpful). Best val loss: 0.1314.  
+**Flash accuracy:**
+- BXL: 24/30 (**80%**) — up from 55% in exp 8. Largest improvement, likely because BXL labels were added and index is small (42 mosaics).
+- PA: 10/30 (**33%**) — appears lower than exp 7 (~43–53%) but high variance in 30-image samples makes direct comparison unreliable.
+**Key finding:** Multi-city labeling dramatically improves smaller cities. PA accuracy is hard to measure reliably with 30-image samples; a fixed held-out eval set is needed. Val loss still trending down at epoch 20.  
+**Weights:** `outputs/models/dinov2_finetuned_aug_crop_labeled/`  
+**Next:** Run more epochs (resume from epoch 20); collect more PA labels to improve the hardest city.
+
+---
+
 ### 8. Cross-city generalisation test — 2026-05-08
 **What:** Tested experiment 7 model (trained exclusively on PA data) on London and Brussels flash images with no city-specific labeled data or fine-tuning.  
 **Results:**
