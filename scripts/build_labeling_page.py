@@ -61,14 +61,19 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
             continue
         top_k = pred.get("top_k", [])[:5]
         invader_id = pred.get("prediction") or ""
-        ref_path = best_reference_image(invader_id) if invader_id else None
+        top_k_refs = {}
+        for c in top_k:
+            ref_p = best_reference_image(c["invader_id"])
+            if ref_p:
+                top_k_refs[c["invader_id"]] = img_to_b64(ref_p)
         results.append({
             "query": q,
             "pred": pred,
             "top_k": top_k,
             "flash_b64": img_to_b64(q["image_path"]),
             "crop_b64": pil_to_b64(crop),
-            "ref_b64": img_to_b64(ref_path) if ref_path else None,
+            "ref_b64": top_k_refs.get(invader_id),
+            "top_k_refs": top_k_refs,
         })
     print(f"\nKept {len(results)} images with detected crops. Building HTML...")
 
@@ -86,11 +91,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
             ville = parts[0]
             num   = parts[1].zfill(4) if len(parts) > 1 else ""
             atlas_url    = f"https://invaderatlas.app/invaders/{iid}"
-            gimage_url   = f"https://www.google.com/search?q=space+invader+{iid}&tbm=isch"
             spotter_args = f"openSpotter('{ville}','{num}')"
             return (
                 f'<div class="candidate-group">'
-                f'<button class="quick-btn" onclick="setLabel(\'{flash_name}\', \'{iid}\')">'
+                f'<button class="quick-btn" onclick="setLabel(\'{flash_name}\', \'{iid}\')"'
+                f' onmouseover="hoverRef(\'{flash_name}\', \'{iid}\')"'
+                f' onmouseout="resetRef(\'{flash_name}\')">'
                 f'{iid} <span class="btn-score">{c["score"]:.3f}</span></button>'
                 f'<a class="ext-link" href="{atlas_url}" target="_blank" title="InvaderAtlas">atlas</a>'
                 f'<a class="ext-link" href="#" onclick="{spotter_args};return false;" title="invader-spotter.art">spotter</a>'
@@ -103,10 +109,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
             else f'<div class="no-img" id="ref_{flash_name}">no ref</div>'
         )
 
-        # Encode top_k as JSON for JS lookup
+        # Encode top_k scores and ref images as JSON for JS lookup
         top_k_json = json.dumps({c["invader_id"]: c["score"] for c in r["top_k"]})
+        refs_json  = json.dumps(r["top_k_refs"])
 
         cards.append(f"""
+        <script>cardRefs["{flash_name}"] = {refs_json};</script>
         <div class="card" id="card_{flash_name}">
           <div class="card-header">
             <span class="city">{city_code}</span>
@@ -116,12 +124,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
           <div class="images">
             <div class="img-block">
               <div class="label">Flash</div>
-              <img src="{r['flash_b64']}" alt="flash">
+              <img src="{r['flash_b64']}" alt="flash" id="flash_{flash_name}">
+              <button class="lens-btn-big" onclick="googleLens('flash_{flash_name}')">🔍 Google Lens</button>
             </div>
             <div class="img-block">
               <div class="label">Crop</div>
               <img src="{r['crop_b64']}" alt="crop" id="crop_{flash_name}">
-              <button class="lens-btn-big" onclick="googleLens('crop_{flash_name}')">🔍 Google Lens</button>
             </div>
             <div class="img-block">
               <div class="label" id="reflabel_{flash_name}">Reference: {prediction}</div>
@@ -194,6 +202,7 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 <body>
 <h1>Flash image labeling — {len(results)} images</h1>
 <p class="subtitle">For each image, confirm or correct the invader ID. Use the quick-select buttons or type directly. Skip anything uncertain.</p>
+<script>var cardRefs = {{}};</script>
 <div class="grid">
 {cards_html}
 </div>
@@ -203,7 +212,6 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 </div>
 <script>
 const labels = {{}};
-const refData = {{}};
 
 function googleLens(imgId) {{
   var img = document.getElementById(imgId);
@@ -228,6 +236,25 @@ function googleLens(imgId) {{
   document.body.appendChild(form);
   form.submit();
   document.body.removeChild(form);
+}}
+
+function hoverRef(filename, invaderId) {{
+  var refs = cardRefs[filename];
+  if (refs && refs[invaderId]) {{
+    var img = document.getElementById('ref_' + filename);
+    if (img && img.tagName === 'IMG') img.src = refs[invaderId];
+    document.getElementById('reflabel_' + filename).textContent = 'Reference: ' + invaderId;
+  }}
+}}
+
+function resetRef(filename) {{
+  var currentId = document.getElementById('input_' + filename).value;
+  var refs = cardRefs[filename];
+  if (refs && currentId && refs[currentId]) {{
+    var img = document.getElementById('ref_' + filename);
+    if (img && img.tagName === 'IMG') img.src = refs[currentId];
+    document.getElementById('reflabel_' + filename).textContent = 'Reference: ' + currentId;
+  }}
 }}
 
 function openSpotter(ville, num) {{
@@ -279,6 +306,7 @@ function setLabel(filename, invaderId) {{
     source: 'user'
   }};
   document.getElementById('card_' + filename).classList.add('labeled');
+  hoverRef(filename, invaderId);
   updateCounter();
 }}
 
