@@ -11,7 +11,7 @@ paths:
 
 embedding:
   type: pretrained
-  model_name: outputs/models/dinov2_finetuned
+  model_name: outputs/models/dinov2_finetuned_aug_crop_labeled
 
 retrieval:
   top_n: 12

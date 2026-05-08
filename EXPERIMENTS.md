@@ -78,6 +78,17 @@ Retrieval-based pipeline:
 
 ---
 
+### 7. DINOv2 fine-tuned with crop triplets + labeled flash images
+**What:** Same as experiment 6, but training mixes two triplet types: (1) reference crop triplets with flash augmentation on anchor, and (2) real labeled flash image as anchor → reference crop of correct invader → reference crop of different invader. 52 labeled flash images oversampled 20× per epoch (~840 flash triplets, 11% of total).  
+**Training:** Google Colab T4 GPU, 20 epochs (~310s/epoch). Best epoch: 20 (val loss still improving at the end — more epochs likely helpful). Best val loss: 0.1310.  
+**Flash accuracy (seed 42, same as previous tests):** 16/30 (~53%) — significant jump from 9/30 with previous model.  
+**Flash accuracy (seed 99, fresh images):** 14/30 (~47%) — modest improvement from 13/30.  
+**Key finding:** Labeled data helps substantially on images similar to the training set, but generalises weakly with only 52 examples. The gap between seen (53%) and fresh (47%) results suggests partial memorisation. Need 200+ labeled images for robust generalisation.  
+**Weights:** `outputs/models/dinov2_finetuned_aug_crop_labeled/`  
+**Next:** Collect more labeled flash images (different seeds in build_labeling_page.py) and retrain.
+
+---
+
 ## Confidence calibration
 
 After fine-tuning without augmentation, recalibrated confidence thresholds to match the new score range (0.45–0.67 vs old 0.72–0.94):
@@ -99,7 +110,8 @@ These will need recalibrating again after the augmented model is trained, since 
 - **`siit build-index`** — builds city-scoped vector indexes from reference manifest
 - **`siit evaluate`** — runs offline retrieval eval on held-out reference images
 - **`scripts/build_validation_page.py`** — generates a self-contained HTML page showing flash images side-by-side with predicted reference images and confidence scores. Used for manual validation.
-- **`scripts/prepare_colab_data.py`** — packages reference images into a zip for Colab upload
+- **`scripts/build_labeling_page.py`** — generates a labeling tool with pre-filled predictions, quick-select buttons, and a download button for exporting labels as JSONL.
+- **`scripts/prepare_colab_data.py`** — packages reference images, detector weights, and labeled flash images into a zip for Colab upload
 - **`notebooks/train_colab.ipynb`** — self-contained Colab notebook with resume support (START_EPOCH / END_EPOCH)
 
 ---
@@ -107,7 +119,8 @@ These will need recalibrating again after the augmented model is trained, since 
 ## Known issues / limitations
 
 - **Offline eval is misleading:** reference-to-reference accuracy (77.6%) is not a reliable proxy for flash-to-reference accuracy (0% before augmentation). Need labeled flash images for honest evaluation.
-- **No labeled flash dataset:** validation is currently manual (look at the HTML page and judge). To measure accuracy properly, need ~50–100 flash images with known identifiers.
+- **Small labeled dataset:** 52 labeled flash images helps on seen images but generalises weakly to new ones. Need 200+ diverse labeled images for meaningful generalisation.
+- **Validation is noisy:** 30-image manual samples have high variance (13–16/30 on the same model). Need a fixed held-out eval set to measure progress reliably.
 - **Confidence thresholds need recalibration** after each new embedder model.
 - **PA is a hard city:** 1700+ mosaics in the index. Even small embedding errors lead to wrong top-1 results. Smaller cities will likely perform better.
 
@@ -118,12 +131,13 @@ These will need recalibrating again after the augmented model is trained, since 
 ### High priority
 - [x] **Evaluate augmented model on flash images** — done, ~23% on manual validation of 30 PA images.
 - [x] **Retrain with cropped reference images** — done, see experiment 6. Improved to ~30–43% on PA.
-- [ ] **Warm start from `dinov2_finetuned_aug`** — try fine-tuning the aug model further on crop triplets instead of starting from bare DINOv2. Should converge faster and potentially better.
-- [ ] **Build a labeled flash dataset** — manually identify ~50 flash images with known invader IDs. Essential for honest accuracy measurement and future training.
-- [ ] **Recalibrate confidence thresholds** — after next model is trained.
+- [x] **Build a labeled flash dataset** — 52 images labeled via build_labeling_page.py. Modest generalisation improvement; need 200+ for meaningful gains.
+- [x] **Include labeled flash images in training** — done, see experiment 7. ~53% on seen images, ~47% on new images.
+- [ ] **Collect more labeled flash images** — target 200+ diverse PA images. Each labeling session + retrain compounds. Use `build_labeling_page.py` with different seeds.
+- [ ] **Recalibrate confidence thresholds** — after enough labeled data exists to measure calibration honestly.
 
 ### Medium priority
-- [ ] **Include labeled flash images in training** — once the labeled flash dataset exists, add (flash image, reference image) pairs as positive triplets. This directly teaches the flash↔reference mapping rather than relying on augmentation alone.
+- [ ] **Hard negative mining** — instead of random negatives, use the nearest-neighbour negatives (mosaics that look similar but are different). Should improve discrimination between visually similar mosaics.
 - [ ] **Hard negative mining** — instead of random negatives, use the nearest-neighbour negatives (mosaics that look similar but are different). Should improve discrimination between visually similar mosaics.
 - [ ] **Unfreeze more layers** — currently only last 2 blocks fine-tuned. With more data, unfreezing all layers or using a lower LR throughout might help.
 
