@@ -18,14 +18,14 @@ Retrieval-based pipeline:
 
 ## Experiments
 
-### 1. Baseline embedder (handcrafted features)
+### 1. Baseline embedder (handcrafted features) — 2026-04-02
 **What:** Colour histograms + edge gradients + pooled gradients. Deterministic, no model weights needed.  
 **Result:** top-1 16%, top-5 57%, MRR 0.30 on reference-to-reference eval (210 queries).  
 **Verdict:** Weak but fast. Surprisingly competitive for colour-heavy pixel-art style content.
 
 ---
 
-### 2. Mosaic detector — YOLOv8
+### 2. Mosaic detector — YOLOv8 — 2026-05-03
 **What:** Trained YOLOv8s on bounding-box annotations of mosaics in flash photos.  
 **Iterations:**
 - v1: 49 images — mAP50 0.924 but only 9 val images, unreliable metric. Best epoch: 1 (immediate overfit).
@@ -38,7 +38,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 3. DINOv2 pretrained (no fine-tuning)
+### 3. DINOv2 pretrained (no fine-tuning) — 2026-05-05
 **What:** Replaced handcrafted embedder with `facebook/dinov2-small` via HuggingFace transformers. 384-dim CLS token embedding.  
 **Result:** top-1 **11%** — worse than the baseline.  
 **Why it failed:** DINOv2 was trained on natural images and extracts semantic features that don't discriminate well between different coloured tile grids. The baseline's colour histograms were actually better suited for this pixel-art content.  
@@ -46,7 +46,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 4. DINOv2 fine-tuned with triplet loss (no augmentation)
+### 4. DINOv2 fine-tuned with triplet loss (no augmentation) — 2026-05-05
 **What:** Fine-tuned last 2 transformer blocks of DINOv2-small using triplet margin loss on reference library images. 1734 train invaders / 305 val invaders. 20 epochs, LR 1e-5.  
 **Result:** top-1 **77.6%**, top-5 93.8%, MRR 0.85 on reference-to-reference eval. Best epoch: 14.  
 **Flash image test:** **0% accuracy** on 50 PA flash images via validation page.  
@@ -55,7 +55,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 5. DINOv2 fine-tuned with triplet loss + augmentation
+### 5. DINOv2 fine-tuned with triplet loss + augmentation — 2026-05-05 to 2026-05-06
 **What:** Same as experiment 4 but the anchor image gets heavy augmentation simulating flash photo conditions: colour jitter, gaussian blur, perspective distortion, affine transform, JPEG compression. Positive gets light augmentation. Negative is clean.  
 **Augmentation library:** `albumentations` (faster than torchvision for geometric transforms).  
 **Training:** Google Colab T4 GPU, 20 epochs in one session (~9 min/epoch). Best epoch: 19, val loss 0.0963.  
@@ -67,7 +67,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 6. DINOv2 fine-tuned with crop triplets (crop both sides)
+### 6. DINOv2 fine-tuned with crop triplets (crop both sides) — 2026-05-06 to 2026-05-07
 **What:** Same augmentation as experiment 5, but reference images are also detector-cropped before embedding — both at index time and during training (all three legs of each triplet use the crop if found, falling back to full image). Starts from bare DINOv2-small, not from the previous fine-tuned model.  
 **Training:** Google Colab T4 GPU, 20 epochs (~285s/epoch). Best epoch: 14, val loss 0.1249.  
 **Val loss higher than exp 5** (0.1249 vs 0.0963) — expected, task is harder with variable crop sizes.  
@@ -78,7 +78,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 7. DINOv2 fine-tuned with crop triplets + labeled flash images
+### 7. DINOv2 fine-tuned with crop triplets + labeled flash images — 2026-05-08
 **What:** Same as experiment 6, but training mixes two triplet types: (1) reference crop triplets with flash augmentation on anchor, and (2) real labeled flash image as anchor → reference crop of correct invader → reference crop of different invader. 52 labeled flash images oversampled 20× per epoch (~840 flash triplets, 11% of total).  
 **Training:** Google Colab T4 GPU, 20 epochs (~310s/epoch). Best epoch: 20 (val loss still improving at the end — more epochs likely helpful). Best val loss: 0.1310.  
 **Flash accuracy (seed 42, same as previous tests):** 16/30 (~53%) — significant jump from 9/30 with previous model.  
@@ -89,7 +89,7 @@ Retrieval-based pipeline:
 
 ---
 
-### 8. Cross-city generalisation test
+### 8. Cross-city generalisation test — 2026-05-08
 **What:** Tested experiment 7 model (trained exclusively on PA data) on London and Brussels flash images with no city-specific labeled data or fine-tuning.  
 **Results:**
 
