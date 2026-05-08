@@ -80,11 +80,23 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
         prediction = r["pred"].get("prediction") or ""
         score      = r["pred"]["diagnostics"]["top_score"]
 
-        quick_btns = "".join(
-            f'<button class="quick-btn" onclick="setLabel(\'{flash_name}\', \'{c["invader_id"]}\')">'
-            f'{c["invader_id"]} <span class="btn-score">{c["score"]:.3f}</span></button>'
-            for c in r["top_k"]
-        )
+        def candidate_html(c):
+            iid = c["invader_id"]
+            parts = iid.split("_")
+            ville = parts[0]
+            num   = parts[1].zfill(4) if len(parts) > 1 else ""
+            atlas_url    = f"https://invaderatlas.app/invaders/{iid}"
+            gimage_url   = f"https://www.google.com/search?q=space+invader+{iid}&tbm=isch"
+            spotter_args = f"openSpotter('{ville}','{num}')"
+            return (
+                f'<div class="candidate-group">'
+                f'<button class="quick-btn" onclick="setLabel(\'{flash_name}\', \'{iid}\')">'
+                f'{iid} <span class="btn-score">{c["score"]:.3f}</span></button>'
+                f'<a class="ext-link" href="{atlas_url}" target="_blank" title="InvaderAtlas">atlas</a>'
+                f'<a class="ext-link" href="#" onclick="{spotter_args};return false;" title="invader-spotter.art">spotter</a>'
+                f'</div>'
+            )
+        quick_btns = "".join(candidate_html(c) for c in r["top_k"])
         ref_img = (
             f'<img src="{r["ref_b64"]}" alt="reference" id="ref_{flash_name}">'
             if r["ref_b64"]
@@ -108,7 +120,8 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
             </div>
             <div class="img-block">
               <div class="label">Crop</div>
-              <img src="{r['crop_b64']}" alt="crop">
+              <img src="{r['crop_b64']}" alt="crop" id="crop_{flash_name}">
+              <button class="lens-btn-big" onclick="googleLens('crop_{flash_name}')">🔍 Google Lens</button>
             </div>
             <div class="img-block">
               <div class="label" id="reflabel_{flash_name}">Reference: {prediction}</div>
@@ -165,6 +178,11 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
   .id-input.confirmed {{ border-color: #4caf50; background: #1a3a1a; }}
   .skip-btn {{ background: transparent; border: 1px solid #444; color: #666; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }}
   .skip-btn:hover {{ border-color: #888; color: #aaa; }}
+  .candidate-group {{ display: flex; align-items: center; gap: 4px; }}
+  .ext-link {{ color: #555; font-size: 0.7rem; text-decoration: none; padding: 3px 6px; border: 1px solid #333; border-radius: 3px; white-space: nowrap; }}
+  .ext-link:hover {{ color: #aaa; border-color: #666; }}
+  .lens-btn-big {{ width: 100%; margin-top: 5px; background: #1a3a5c; border: 1px solid #2a6aa0; color: #7bc8f0; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }}
+  .lens-btn-big:hover {{ background: #1e4a7a; border-color: #4a9ad4; }}
   #toolbar {{ position: fixed; bottom: 16px; right: 16px; background: #1e1e1e; border: 1px solid #444; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }}
   #counter {{ font-size: 0.9rem; color: #aaa; }}
   #counter span {{ color: #4caf50; font-weight: bold; }}
@@ -186,6 +204,46 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 <script>
 const labels = {{}};
 const refData = {{}};
+
+function googleLens(imgId) {{
+  var img = document.getElementById(imgId);
+  var base64 = img.src.split(',')[1];
+  var byteStr = atob(base64);
+  var ab = new ArrayBuffer(byteStr.length);
+  var ia = new Uint8Array(ab);
+  for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+  var blob = new Blob([ab], {{type: 'image/jpeg'}});
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'https://lens.google.com/v3/upload';
+  form.enctype = 'multipart/form-data';
+  form.target = '_blank';
+  var fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.name = 'encoded_image';
+  var dt = new DataTransfer();
+  dt.items.add(new File([blob], 'crop.jpg', {{type: 'image/jpeg'}}));
+  fileInput.files = dt.files;
+  form.appendChild(fileInput);
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+}}
+
+function openSpotter(ville, num) {{
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = 'https://www.invader-spotter.art/listing.php';
+  form.target = '_blank';
+  [['ville', ville], ['num', num]].forEach(function(f) {{
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = f[0]; inp.value = f[1];
+    form.appendChild(inp);
+  }});
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+}}
 
 // Pre-populate with current predictions so they show as labeled
 document.querySelectorAll('.id-input').forEach(inp => {{
