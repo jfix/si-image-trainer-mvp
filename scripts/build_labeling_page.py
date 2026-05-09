@@ -48,8 +48,31 @@ def best_reference_image(invader_id: str) -> Path | None:
     return None
 
 
+def build_all_ref_paths(config: dict) -> dict:
+    """Map every invader_id → file:// URL of its best reference image."""
+    manifest_path = Path(config["paths"]["reference_manifest"])
+    ref_root_parent = REFERENCE_ROOT.parent
+    role_priority = {"grosplan": 0, "reference": 1, "flash-reference": 2}
+    best: dict = {}
+    for line in manifest_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        iid = row["invader_id"]
+        role = row.get("role", "other")
+        p = Path(row["image_path"])
+        if not p.exists():
+            continue
+        priority = role_priority.get(role, 99)
+        if iid not in best or priority < best[iid][0]:
+            best[iid] = (priority, str(p))
+    return {iid: f"file://{d[1]}" for iid, d in best.items()}
+
+
 def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
     detector = MosaicDetector(**config["detector"]) if config.get("detector") else None
+    print("Building reference path index...")
+    all_ref_paths = build_all_ref_paths(config)
     print(f"Running predictions on {len(queries)} images...")
     results = []
     for i, q in enumerate(queries, 1):
@@ -152,6 +175,12 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 
     cards_html = "\n".join(cards)
 
+    # Global lookup of all reference images across all cards
+    all_refs = {}
+    for r in results:
+        all_refs.update(r["top_k_refs"])
+    all_refs_json = json.dumps(all_refs)
+
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -202,7 +231,7 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 <body>
 <h1>Flash image labeling — {len(results)} images</h1>
 <p class="subtitle">For each image, confirm or correct the invader ID. Use the quick-select buttons or type directly. Skip anything uncertain.</p>
-<script>var cardRefs = {{}};</script>
+<script>var cardRefs = {{}}; var allRefs = {all_refs_json}; var allRefPaths = {json.dumps(all_ref_paths)};</script>
 <div class="grid">
 {cards_html}
 </div>
@@ -239,11 +268,15 @@ function googleLens(imgId) {{
 }}
 
 function hoverRef(filename, invaderId) {{
-  var refs = cardRefs[filename];
-  if (refs && refs[invaderId]) {{
-    var img = document.getElementById('ref_' + filename);
-    if (img && img.tagName === 'IMG') img.src = refs[invaderId];
-    document.getElementById('reflabel_' + filename).textContent = 'Reference: ' + invaderId;
+  var refs = cardRefs[filename] || {{}};
+  var src = refs[invaderId] || allRefs[invaderId] || allRefPaths[invaderId];
+  var img = document.getElementById('ref_' + filename);
+  var label = document.getElementById('reflabel_' + filename);
+  if (src) {{
+    if (img && img.tagName === 'IMG') img.src = src;
+    if (label) label.textContent = 'Reference: ' + invaderId;
+  }} else if (invaderId && invaderId.length >= 4) {{
+    if (label) label.textContent = 'Reference: ' + invaderId + ' (no preview)';
   }}
 }}
 
@@ -305,7 +338,9 @@ function setLabel(filename, invaderId) {{
     invader_id: invaderId,
     source: 'user'
   }};
-  document.getElementById('card_' + filename).classList.add('labeled');
+  const card = document.getElementById('card_' + filename);
+  card.classList.add('labeled');
+  card.classList.remove('skipped');
   hoverRef(filename, invaderId);
   updateCounter();
 }}
@@ -313,6 +348,7 @@ function setLabel(filename, invaderId) {{
 function onInput(filename, value) {{
   const inp = document.getElementById('input_' + filename);
   const cleaned = value.trim().toUpperCase();
+  const card = document.getElementById('card_' + filename);
   if (cleaned.length >= 4) {{
     labels[filename] = {{
       image_path: inp.dataset.imagePath,
@@ -321,11 +357,13 @@ function onInput(filename, value) {{
       source: 'user'
     }};
     inp.classList.add('confirmed');
-    document.getElementById('card_' + filename).classList.add('labeled');
+    card.classList.add('labeled');
+    card.classList.remove('skipped');
+    hoverRef(filename, cleaned);
   }} else {{
     delete labels[filename];
     inp.classList.remove('confirmed');
-    document.getElementById('card_' + filename).classList.remove('labeled');
+    card.classList.remove('labeled');
   }}
   updateCounter();
 }}
