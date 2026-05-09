@@ -11,9 +11,26 @@ FLASH_LABELS  = Path("data/processed/flash_labels.jsonl")
 OUTPUT_ZIP    = Path("outputs/colab_training_data.zip")
 
 
+MIN_IMAGES_PER_CITY = 200  # keep only cities with enough reference images to contribute useful triplets
+
+
 def main() -> None:
     rows = [json.loads(l) for l in MANIFEST.read_text().splitlines() if l.strip()]
     print(f"Manifest rows: {len(rows)}")
+
+    from collections import Counter
+    city_img_counts = Counter(r["city_code"] for r in rows)
+    keep_cities = {c for c, n in city_img_counts.items() if n >= MIN_IMAGES_PER_CITY}
+
+    # Always keep cities with flash labels regardless of size
+    if FLASH_LABELS.exists():
+        flash_rows = [json.loads(l) for l in FLASH_LABELS.read_text().splitlines() if l.strip()]
+        for r in flash_rows:
+            keep_cities.add(r["city_code"])
+
+    before = len(rows)
+    rows = [r for r in rows if r["city_code"] in keep_cities]
+    print(f"Keeping {len(keep_cities)} cities (≥{MIN_IMAGES_PER_CITY} images or labeled): {len(rows)} rows (dropped {before - len(rows)})")
 
     missing = [r for r in rows if not Path(r["image_path"]).exists()]
     if missing:
