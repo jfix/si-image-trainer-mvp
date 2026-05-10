@@ -89,6 +89,21 @@ Retrieval-based pipeline:
 
 ---
 
+### 8. Cross-city generalisation test — 2026-05-08
+**What:** Tested experiment 7 model (trained exclusively on PA data) on London and Brussels flash images with no city-specific labeled data or fine-tuning.  
+**Results:**
+
+| City | Approx. mosaics in index | Accuracy (20 images) |
+|------|--------------------------|----------------------|
+| PA   | ~1700                    | ~50%                 |
+| LDN  | ~600                     | 60%                  |
+| BXL  | ~200                     | 55%                  |
+
+**Key finding:** The model generalises across cities without any city-specific training. Smaller indexes perform better — fewer candidates means less competition. The system is usable today for smaller cities as-is.  
+**Next:** More PA labeled data will improve PA accuracy and likely lift other cities too via better general embeddings.
+
+---
+
 ### 9. DINOv2 fine-tuned with 291 labeled flash images across 4 cities — 2026-05-08
 **What:** Same architecture as experiment 7, but labeled dataset grows from 52 → 291 images across PA (107), LDN (88), MARS (47), BXL (49). ~248 flash pairs used for training after val split. FLASH_OVERSAMPLE=20 → ~4960 flash triplets per epoch (~5× more than exp 7).  
 **Training:** Google Colab T4 GPU, 20 epochs (~370s/epoch). Best epoch: 20 (val loss still improving — more epochs helpful). Best val loss: 0.1314.  
@@ -129,21 +144,6 @@ Retrieval-based pipeline:
 **Key finding:** Step-change in accuracy across all cities. Val loss 0.1080 (~16% better than previous best 0.1287) fully translated to flash accuracy this time. The combination of 604 diverse labeled images + 40 epochs unlocked a new performance level. Smaller cities are essentially solved; PA at 74% is the remaining challenge given its 1568-mosaic index.  
 **Weights:** `outputs/models/dinov2_finetuned_aug_crop_labeled/`  
 **Next:** Test other cities (LDN, MARS, DJBA, ROM). Consider hard negative mining to push PA further. Label more cities.
-
----
-
-### 8. Cross-city generalisation test — 2026-05-08
-**What:** Tested experiment 7 model (trained exclusively on PA data) on London and Brussels flash images with no city-specific labeled data or fine-tuning.  
-**Results:**
-
-| City | Approx. mosaics in index | Accuracy (20 images) |
-|------|--------------------------|----------------------|
-| PA   | ~1700                    | ~50%                 |
-| LDN  | ~600                     | 60%                  |
-| BXL  | ~200                     | 55%                  |
-
-**Key finding:** The model generalises across cities without any city-specific training. Smaller indexes perform better — fewer candidates means less competition. The system is usable today for smaller cities as-is.  
-**Next:** More PA labeled data will improve PA accuracy and likely lift other cities too via better general embeddings.
 
 ---
 
@@ -195,7 +195,6 @@ These will need recalibrating again after the augmented model is trained, since 
 - [ ] **Recalibrate confidence thresholds** — after enough labeled data exists to measure calibration honestly.
 
 ### Medium priority
-- [ ] **Hard negative mining** — instead of random negatives, use the nearest-neighbour negatives (mosaics that look similar but are different). Should improve discrimination between visually similar mosaics.
 - [ ] **Hard negative mining** — instead of random negatives, use the nearest-neighbour negatives (mosaics that look similar but are different). Should improve discrimination between visually similar mosaics.
 - [ ] **Unfreeze more layers** — currently only last 2 blocks fine-tuned. With more data, unfreezing all layers or using a lower LR throughout might help.
 
