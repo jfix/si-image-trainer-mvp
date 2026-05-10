@@ -176,11 +176,10 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ## Known issues / limitations
 
-- **Offline eval is misleading:** reference-to-reference accuracy (77.6%) is not a reliable proxy for flash-to-reference accuracy (0% before augmentation). Need labeled flash images for honest evaluation.
-- **Small labeled dataset:** 52 labeled flash images helps on seen images but generalises weakly to new ones. Need 200+ diverse labeled images for meaningful generalisation.
-- **Validation is noisy:** 30-image manual samples have high variance (13–16/30 on the same model). Need a fixed held-out eval set to measure progress reliably.
-- **Confidence thresholds need recalibration** after each new embedder model.
-- **PA is a hard city:** 1700+ mosaics in the index. Even small embedding errors lead to wrong top-1 results. Smaller cities will likely perform better.
+- **Offline eval is misleading:** reference-to-reference accuracy is not a reliable proxy for flash-to-reference accuracy. Use labeled flash images + validation pages for honest evaluation.
+- **Validation is noisy:** 30–50 image manual samples have meaningful variance. A fixed held-out eval set would give more reliable progress tracking.
+- **Confidence thresholds need recalibration** after each new embedder model — current thresholds were set on an earlier model.
+- **PA is a hard city:** 1568 mosaics in the index. At 74% accuracy many mosaics are still confused with visually similar neighbours.
 
 ---
 
@@ -189,16 +188,18 @@ These will need recalibrating again after the augmented model is trained, since 
 ### High priority
 - [x] **Evaluate augmented model on flash images** — done, ~23% on manual validation of 30 PA images.
 - [x] **Retrain with cropped reference images** — done, see experiment 6. Improved to ~30–43% on PA.
-- [x] **Build a labeled flash dataset** — 52 images labeled via build_labeling_page.py. Modest generalisation improvement; need 200+ for meaningful gains.
-- [x] **Include labeled flash images in training** — done, see experiment 7. ~53% on seen images, ~47% on new images.
-- [ ] **Collect more labeled flash images** — target 200+ diverse PA images. Each labeling session + retrain compounds. Use `build_labeling_page.py` with different seeds.
-- [ ] **Recalibrate confidence thresholds** — after enough labeled data exists to measure calibration honestly.
+- [x] **Build a labeled flash dataset** — done, 604 images across 7 cities (PA, LDN, MARS, BXL, DJBA, BAB, ROM).
+- [x] **Include labeled flash images in training** — done, see experiments 7–11. PA 74%, smaller cities 87–100%.
+- [x] **Collect more labeled flash images** — 604 labels collected. Smaller cities solved; PA still improving.
+- [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly since last calibration.
+- [ ] **Hard negative mining** — mine nearest-neighbour negatives instead of random ones. Main remaining lever for PA accuracy.
 
 ### Medium priority
-- [ ] **Hard negative mining** — instead of random negatives, use the nearest-neighbour negatives (mosaics that look similar but are different). Should improve discrimination between visually similar mosaics.
-- [ ] **Unfreeze more layers** — currently only last 2 blocks fine-tuned. With more data, unfreezing all layers or using a lower LR throughout might help.
+- [ ] **More PA labels** — 276 PA labels vs 1568 mosaics is still a weak ratio. Each labeling session + retrain compounds.
+- [ ] **Unfreeze more layers** — currently only last 2 blocks fine-tuned. With 600+ labeled images, unfreezing more layers may help.
+- [ ] **Label more cities** — VRS, WN, LY, AVI etc. have flash images and reference mosaics but no labeled data yet.
 
 ### Lower priority
 - [ ] **Mosaic region quality** — some detector crops are partial or off-centre. A rectification step (homography estimation) could improve crop quality.
 - [ ] **Multi-image aggregation** — some invaders have 3–4 reference images. Currently aggregated by max score; could try learned aggregation.
-- [ ] **City-specific tuning** — PA has very different characteristics from smaller cities. City-specific index tuning or separate models might help.
+- [ ] **Fixed held-out eval set** — build a labelled test set that is never used for training, for reliable progress measurement.
