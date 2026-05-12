@@ -147,6 +147,21 @@ Retrieval-based pipeline:
 
 ---
 
+### 12. Hard negative mining (mined from base model) — 2026-05-12
+**What:** Same architecture as experiment 11, but with hard negative mining: embed all reference images, find top-30 nearest wrong neighbours per invader, use those as negatives instead of random ones. Warm-started from bare DINOv2-small (mistake — see below).  
+**Training:** Google Colab T4 GPU, 40 epochs. Best epoch: 38, val loss **0.1298** — worse than exp 11 (0.1080).  
+**Why it failed:** Hard negative mining ran on the untrained base DINOv2 model before any fine-tuning. Without task-specific embeddings, "hard" negatives were effectively random — no better than the random baseline, and the extra complexity may have hurt.  
+**Fix:** Mine hard negatives from the exp 11 checkpoint (which already knows what looks similar in the mosaic space). See experiment 13.  
+**Weights:** not saved (worse than exp 11).
+
+---
+
+### 13. Hard negative mining from exp 11 weights — 2026-05-12
+**What:** Same as experiment 12, but model is warm-started from exp 11 weights and hard negatives are mined from those weights before training begins. `best_val_loss` initialised to 0.1080 (exp 11 baseline) — only saves if it beats exp 11.  
+**Training:** in progress.
+
+---
+
 ## Confidence calibration
 
 After fine-tuning without augmentation, recalibrated confidence thresholds to match the new score range (0.45–0.67 vs old 0.72–0.94):
@@ -192,7 +207,7 @@ These will need recalibrating again after the augmented model is trained, since 
 - [x] **Include labeled flash images in training** — done, see experiments 7–11. PA 74%, smaller cities 87–100%.
 - [x] **Collect more labeled flash images** — 604 labels collected. Smaller cities solved; PA still improving.
 - [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly since last calibration.
-- [ ] **Hard negative mining** — mine nearest-neighbour negatives instead of random ones. Main remaining lever for PA accuracy.
+- [x] **Hard negative mining** — implemented. Exp 12 failed (mined from base model). Exp 13 in progress (mined from exp 11 weights).
 
 ### Medium priority
 - [ ] **More PA labels** — 276 PA labels vs 1568 mosaics is still a weak ratio. Each labeling session + retrain compounds.
