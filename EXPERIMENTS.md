@@ -156,8 +156,17 @@ Retrieval-based pipeline:
 
 ---
 
-### 13. Hard negative mining from exp 11 weights — 2026-05-12
-**What:** Same as experiment 12, but model is warm-started from exp 11 weights and hard negatives are mined from those weights before training begins. `best_val_loss` initialised to 0.1080 (exp 11 baseline) — only saves if it beats exp 11.  
+### 13. Hard negative mining from exp 12 weights (warm-start confusion) — 2026-05-12
+**What:** Same as experiment 12, but intended to warm-start from exp 11 and mine from exp 11 weights. In practice, `WARMSTART_FROM` pointed to the Drive checkpoint which held exp 12 weights (0.1298), not exp 11 (0.1080). Mining therefore ran on the same mediocre model as exp 12.  
+**Training:** Google Colab T4 GPU, 40 epochs. Best val loss: **0.1298** (never beat exp 12 baseline). Nothing saved.  
+**Root cause:** Drive checkpoint was overwritten by exp 12 before exp 13 ran. Exp 11 weights only existed locally.  
+**Fix:** Remove hard negative mining entirely. Add explicit `BEST_VAL_LOSS_BASELINE = 0.1080` in notebook config so future runs always target exp 11's score regardless of what's on Drive.  
+**Weights:** not saved.
+
+---
+
+### 14. Exp 11 recipe + 836 labeled images — 2026-05-14
+**What:** Return to the exp 11 recipe (no hard negatives). Labeled dataset grows from 604 → 836 images (PA: 508, LDN: 88, MARS: 47, BXL: 49, DJBA: 50, BAB: 47, ROM: 47). Warm-started from Drive checkpoint. `BEST_VAL_LOSS_BASELINE = 0.1080` — only saves if it beats exp 11.  
 **Training:** in progress.
 
 ---
