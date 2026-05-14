@@ -19,9 +19,4 @@ data/processed/*
 !data/processed/flash_labels.jsonl
 data/detector/
 
-outputs/models/*
-!outputs/models/.gitkeep
-outputs/indexes/*
-!outputs/indexes/.gitkeep
-outputs/reports/*
-!outputs/reports/.gitkeep
+outputs/
