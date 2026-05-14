@@ -165,8 +165,16 @@ Retrieval-based pipeline:
 
 ---
 
-### 14. Exp 11 recipe + 836 labeled images — 2026-05-14
-**What:** Return to the exp 11 recipe (no hard negatives). Labeled dataset grows from 604 → 836 images (PA: 508, LDN: 88, MARS: 47, BXL: 49, DJBA: 50, BAB: 47, ROM: 47). Warm-started from Drive checkpoint. `BEST_VAL_LOSS_BASELINE = 0.1080` — only saves if it beats exp 11.  
+### 14. Exp 11 recipe + 836 labeled images (warm-start from Drive) — 2026-05-14
+**What:** Return to the exp 11 recipe (no hard negatives). Labeled dataset grows from 604 → 836 images (PA: 508, LDN: 88, MARS: 47, BXL: 49, DJBA: 50, BAB: 47, ROM: 47). Warm-started from Drive checkpoint (exp 12/13 weights = 0.1298). `BEST_VAL_LOSS_BASELINE = 0.1080`.  
+**Training:** Google Colab T4 GPU, 40 epochs. Best achieved: 0.1193 (epoch 21). Never beat baseline 0.1080. Nothing saved.  
+**Why it failed:** Drive checkpoint was contaminated by exp 12/13 (0.1298). Starting val loss was 0.1307 — already worse than exp 11, couldn't recover in 40 epochs.  
+**Fix:** Train from base DINOv2 (`WARMSTART_FROM = ''`), same as exp 11 did. More data should push below 0.1080.
+
+---
+
+### 15. Exp 11 recipe from scratch + 836 labeled images — 2026-05-14
+**What:** Same as experiment 11 but with 836 labeled images (vs 604). Trains from base `facebook/dinov2-small` — no warm-start. `BEST_VAL_LOSS_BASELINE = 0.1080`.  
 **Training:** in progress.
 
 ---
