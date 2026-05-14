@@ -226,6 +226,9 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
   #download-btn {{ background: #2e7d32; border: none; color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: bold; }}
   #download-btn:hover {{ background: #388e3c; }}
   #download-btn:disabled {{ background: #333; color: #666; cursor: default; }}
+  #filter-skipped-btn {{ background: transparent; border: 1px solid #555; color: #aaa; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }}
+  #filter-skipped-btn:hover {{ border-color: #888; color: #eee; }}
+  #filter-skipped-btn.active {{ background: #5a3a00; border-color: #c87800; color: #f0a030; }}
 </style>
 </head>
 <body>
@@ -237,6 +240,7 @@ def build_page(config: dict, queries: list[dict], output_path: Path) -> None:
 </div>
 <div id="toolbar">
   <div id="counter"><span id="label-count">0</span> labeled</div>
+  <button id="filter-skipped-btn" onclick="toggleSkippedFilter()">Show skipped</button>
   <button id="download-btn" onclick="downloadLabels()" disabled>Download labels.jsonl</button>
 </div>
 <script>
@@ -374,6 +378,21 @@ function skipCard(filename) {{
   document.getElementById('card_' + filename).classList.add('skipped');
   document.getElementById('card_' + filename).classList.remove('labeled');
   updateCounter();
+}}
+
+let showingSkipped = false;
+function toggleSkippedFilter() {{
+  showingSkipped = !showingSkipped;
+  const btn = document.getElementById('filter-skipped-btn');
+  btn.classList.toggle('active', showingSkipped);
+  btn.textContent = showingSkipped ? 'Show all' : 'Show skipped';
+  document.querySelectorAll('.card').forEach(card => {{
+    if (showingSkipped) {{
+      card.style.display = card.classList.contains('skipped') ? '' : 'none';
+    }} else {{
+      card.style.display = '';
+    }}
+  }});
 }}
 
 function downloadLabels() {{
