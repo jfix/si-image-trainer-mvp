@@ -175,9 +175,18 @@ Retrieval-based pipeline:
 
 ### 15. Exp 11 recipe from scratch + 930 labeled images — 2026-05-14
 **What:** Same as experiment 11 but with 930 labeled images (vs 604). Trains from base `facebook/dinov2-small` — no warm-start. `BEST_VAL_LOSS_BASELINE = 0.1080`. Label breakdown: PA (602), LDN (88), MARS (47), BXL (49), DJBA (50), BAB (47), ROM (47). 326 more images than exp 11.  
-**Training:** Google Colab T4 GPU, 40 epochs. Converged notably faster than exp 11 — val 0.1117 by epoch 7 vs epoch ~20 in exp 11. Final results pending.  
-**Early read:** Fast convergence with more data suggests the additional labels are meaningfully strengthening the embedding. Baseline (0.1080) not beaten yet but trajectory is promising.  
-**Weights:** saved if/when val loss beats 0.1080.
+**Training:** Google Colab T4 GPU, 40 epochs (~560s/epoch). Best epoch: 12, val loss **0.1143**. Never beat baseline 0.1080. Nothing saved.  
+**Val loss trajectory:** Fast initial descent (0.1462 → 0.1182 by epoch 8), then plateaued and oscillated between 0.114–0.125 for the remaining 32 epochs. Train loss kept falling to 0.006, creating a large train/val gap — classic overfitting.  
+**Why it failed to improve:** Same recipe + more data was not enough to break through. The model memorised training triplets but didn't generalise better. The training regime itself has hit its ceiling.  
+**Weights:** not saved (never beat 0.1080).  
+**Next:** Change something — hard negative mining (now with exp 11 embeddings, which are meaningful), lower LR, or more PA labels.
+
+---
+
+### 16. Lower LR + warm-start from exp 11 — 2026-05-15
+**What:** Same data as exp 15 (930 labels). Two changes: (1) LR halved from 1e-5 → 5e-6 to address the val loss oscillation seen in exp 15; (2) warm-start from exp 11 weights (the best model we have, val 0.1080) instead of base DINOv2. Run for 20 epochs — model already knows the structure, just refining.  
+**Hypothesis:** exp 15's noisy plateau (0.114–0.125 for 30 epochs) was caused by overshooting with LR=1e-5. Starting from a good checkpoint + lower LR should allow finer refinement.  
+**Training:** in progress.
 
 ---
 
@@ -235,7 +244,7 @@ These will need recalibrating again after the augmented model is trained, since 
 - [ ] **Build a proper eval framework** — compute P@1 and Recall@K on a fixed held-out set (not a 30-image spot-check). Script should run in < 60s and produce a single score to track per experiment.
 
 ### Medium priority
-- [ ] **Hard negative mining (revisit with exp 15 model)** — now that the embedding space is well-structured, mining the top-k false positives and adding them as labeled negatives should sharpen decision boundaries. Do this after confirming exp 15 beats 0.1080.
+- [ ] **Hard negative mining (high priority now)** — exp 15 confirmed the recipe has hit its ceiling. Mine hard negatives from the exp 11 checkpoint (val 0.1080, the best model we have). Unlike exp 12/13, the embedding space is now meaningful so mined negatives will actually be hard.
 - [ ] **More PA labels** — 602 PA labels vs 1570 mosaics is ~38% coverage. Each labeling session + retrain has consistently improved accuracy; continue toward 1000+ PA labels.
 - [ ] **Label more cities** — VRS (39), WN (56), LY (48), AVI (41), NY (192), TK (135), HK (132) all have flash images and reference mosaics but no labeled data. 200+ labels per city would improve generalisation.
 - [ ] **Unfreeze more layers** — currently only last 2 transformer blocks fine-tuned. With 900+ labeled images, unfreezing additional blocks may help capacity-limited learning.
