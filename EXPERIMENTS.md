@@ -198,6 +198,13 @@ Retrieval-based pipeline:
 
 ---
 
+### 17. Flash-aware val loss, from scratch, 930 labels — 2026-05-16
+**What:** Same data as exp 15/16 (930 labels). Key change: val loss is now a combined metric — 50% reference↔reference triplet loss + 50% flash→reference triplet loss. 15% of labeled flash images are held out as a flash val set (not used in training). Trains from base `facebook/dinov2-small`, LR 1e-5, 40 epochs. `BEST_VAL_LOSS_BASELINE` reset to 1.0 (new metric, not comparable to prior runs).  
+**Why:** Exp 16 showed that reference-only val loss (0.0706) can be completely decoupled from flash accuracy (38%). The combined metric forces the model to optimise for what we actually care about.  
+**Training:** in progress.
+
+---
+
 ## Confidence calibration
 
 After fine-tuning without augmentation, recalibrated confidence thresholds to match the new score range (0.45–0.67 vs old 0.72–0.94):
