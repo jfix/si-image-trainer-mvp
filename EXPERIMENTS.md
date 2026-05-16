@@ -184,9 +184,13 @@ Retrieval-based pipeline:
 ---
 
 ### 16. Lower LR + warm-start from exp 11 — 2026-05-15
-**What:** Same data as exp 15 (930 labels). Two changes: (1) LR halved from 1e-5 → 5e-6 to address the val loss oscillation seen in exp 15; (2) warm-start from exp 11 weights (the best model we have, val 0.1080) instead of base DINOv2. Run for 20 epochs — model already knows the structure, just refining.  
-**Hypothesis:** exp 15's noisy plateau (0.114–0.125 for 30 epochs) was caused by overshooting with LR=1e-5. Starting from a good checkpoint + lower LR should allow finer refinement.  
-**Training:** in progress.
+**What:** Same data as exp 15 (930 labels). Two changes: (1) LR halved from 1e-5 → 5e-6 to address the val loss oscillation seen in exp 15; (2) warm-start from exp 11 weights (val 0.1080) instead of base DINOv2. 20 epochs.  
+**Training:** Google Colab T4 GPU, 20 epochs (~600s/epoch). Best epoch: **1**, val loss **0.0706** — new overall best by a large margin (35% improvement over exp 11's 0.1080). Saved to Drive.  
+**Val loss trajectory:** 0.0706 → 0.0752 → … → 0.0882 → 0.0772. Best at epoch 1, slowly degraded, partial recovery at epoch 20. Never improved on epoch 1.  
+**Why it worked:** warm-start from exp 11 put the model in a well-structured embedding space. One pass over the 930 labels at low LR was enough to improve substantially. Continued training caused overfitting — the model had memorised training triplets before the val distribution could be learned further.  
+**Key learning:** with warm-start, the value is in the first few epochs. Future runs should stop at 5–10 epochs, not 20–40.  
+**Weights:** saved (epoch 1, val 0.0706).  
+**Next:** run flash accuracy validation to see if 0.0706 val loss translates to real accuracy gains. Then consider: more labels → retrain same recipe, or hard negative mining from this model.
 
 ---
 
@@ -239,8 +243,10 @@ These will need recalibrating again after the augmented model is trained, since 
 - [x] **Build a labeled flash dataset** — done, 930 images across 7 cities (PA: 602, LDN: 88, MARS: 47, BXL: 49, DJBA: 50, BAB: 47, ROM: 47).
 - [x] **Include labeled flash images in training** — done, see experiments 7–11. PA 74%, smaller cities 87–100%.
 - [x] **Collect more labeled flash images** — 930 labels collected. Smaller cities largely solved; PA needs more.
-- [x] **Hard negative mining** — tried in exp 12/13/14. All failed: exp 12/13 mined from wrong/untrained model; exp 14 started from contaminated Drive checkpoint. **Abandoned for now.** Worth revisiting once exp 15 model is confirmed good — mining from a well-trained model is a different story.
-- [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly. Need to sweep thresholds against a labeled test set and re-derive `certainly / probably / maybe` cutoffs.
+- [x] **Hard negative mining** — tried in exp 12/13/14. All failed. Abandoned for now.
+- [x] **Lower LR + warm-start recipe** — exp 16 achieved val 0.0706 (35% better than exp 11). Best epoch was 1 — key learning: warm-start needs only 5–10 epochs, not 20–40.
+- [ ] **Validate exp 16 on flash images** — run validation page for PA, LDN, MARS to confirm val loss improvement translates to real accuracy gains.
+- [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly (0.07 range vs old 0.10 range). Must redo before deploying.
 - [ ] **Build a proper eval framework** — compute P@1 and Recall@K on a fixed held-out set (not a 30-image spot-check). Script should run in < 60s and produce a single score to track per experiment.
 
 ### Medium priority
