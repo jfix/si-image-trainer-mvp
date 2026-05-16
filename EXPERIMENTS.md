@@ -190,7 +190,11 @@ Retrieval-based pipeline:
 **Why it worked:** warm-start from exp 11 put the model in a well-structured embedding space. One pass over the 930 labels at low LR was enough to improve substantially. Continued training caused overfitting — the model had memorised training triplets before the val distribution could be learned further.  
 **Key learning:** with warm-start, the value is in the first few epochs. Future runs should stop at 5–10 epochs, not 20–40.  
 **Weights:** saved (epoch 1, val 0.0706).  
-**Next:** run flash accuracy validation to see if 0.0706 val loss translates to real accuracy gains. Then consider: more labels → retrain same recipe, or hard negative mining from this model.
+**Flash accuracy (PA, seed 42, 50 images):** 19/50 (**38%**) — dramatically worse than exp 11's 74% on the same seed.  
+**Why it failed:** Val loss measures reference↔reference discrimination. Warm-starting from exp 11 and continuing training pushed the embedding further into reference-space, causing flash images to land further from their correct match. Lower val loss did not mean better flash accuracy — the opposite.  
+**Critical finding:** Reference-only val loss is not a reliable proxy for flash accuracy. A model can achieve a low val loss by over-specialising in reference↔reference matching while losing the flash→reference bridging capability that augmentation was supposed to provide.  
+**Fix needed:** Include labeled flash images in the val loss computation (flash anchor → correct reference should be measured directly). Until then, always verify flash accuracy manually after each run.  
+**Production model:** revert to exp 11 (val 0.1080, flash 74% PA).
 
 ---
 
@@ -245,7 +249,8 @@ These will need recalibrating again after the augmented model is trained, since 
 - [x] **Collect more labeled flash images** — 930 labels collected. Smaller cities largely solved; PA needs more.
 - [x] **Hard negative mining** — tried in exp 12/13/14. All failed. Abandoned for now.
 - [x] **Lower LR + warm-start recipe** — exp 16 achieved val 0.0706 (35% better than exp 11). Best epoch was 1 — key learning: warm-start needs only 5–10 epochs, not 20–40.
-- [ ] **Validate exp 16 on flash images** — run validation page for PA, LDN, MARS to confirm val loss improvement translates to real accuracy gains.
+- [x] **Validate exp 16 on flash images** — done: 19/50 (38%) on PA seed 42. Worse than exp 11 (74%). Val loss is not a reliable proxy for flash accuracy.
+- [ ] **Fix val loss metric** — include labeled flash pairs in val loss computation so the metric directly measures flash→reference matching, not just reference↔reference. This is the most important architectural change needed before the next training run.
 - [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly (0.07 range vs old 0.10 range). Must redo before deploying.
 - [ ] **Build a proper eval framework** — compute P@1 and Recall@K on a fixed held-out set (not a 30-image spot-check). Script should run in < 60s and produce a single score to track per experiment.
 
