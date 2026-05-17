@@ -198,10 +198,13 @@ Retrieval-based pipeline:
 
 ---
 
-### 17. Flash-aware val loss, from scratch, 930 labels — 2026-05-16
-**What:** Same data as exp 15/16 (930 labels). Key change: val loss is now a combined metric — 50% reference↔reference triplet loss + 50% flash→reference triplet loss. 15% of labeled flash images are held out as a flash val set (not used in training). Trains from base `facebook/dinov2-small`, LR 1e-5, 40 epochs. `BEST_VAL_LOSS_BASELINE` reset to 1.0 (new metric, not comparable to prior runs).  
-**Why:** Exp 16 showed that reference-only val loss (0.0706) can be completely decoupled from flash accuracy (38%). The combined metric forces the model to optimise for what we actually care about.  
-**Training:** in progress.
+### 17. Flash-aware val loss, from scratch, 930 labels — 2026-05-17
+**What:** Same data as exp 15/16 (930 labels). Key change: val loss is now a combined metric — 50% reference↔reference triplet loss + 50% flash→reference triplet loss. 15% of labeled flash images held out as flash val set. Trains from base `facebook/dinov2-small`, LR 1e-5, 40 epochs.  
+**Why:** Exp 16 showed reference-only val loss (0.0706) is completely decoupled from flash accuracy (38%). Combined metric forces optimisation for what we actually care about.  
+**Training:** Google Colab T4 GPU, 40 epochs (~553s/epoch). Best epoch: **17**, combined val **0.0636** (ref=0.1190, flash=**0.0082**). New overall best.  
+**Flash component trajectory:** 0.0571 → 0.0282 → 0.0082 (epoch 17) → oscillates 0.008–0.034 → settles ~0.015–0.02. Near-zero flash val loss at best epoch suggests strong flash→reference alignment.  
+**Weights:** saved at epoch 17 (`si-experiments/exp17` on Drive).  
+**Next:** validate on flash images — if flash val loss translates to real accuracy, this is a major breakthrough.
 
 ---
 
