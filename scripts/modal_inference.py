@@ -17,6 +17,8 @@ import os
 from pathlib import Path
 import subprocess
 from datetime import datetime, timezone
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from typing import Optional
 
 import modal
@@ -36,6 +38,8 @@ LOCAL_MODEL_DIR    = Path("outputs/models/exp17")
 LOCAL_INDEX_DIR    = Path("outputs/indexes")
 LOCAL_DETECTOR_PATH = Path("outputs/models/mosaic_detector_v3.pt")
 LOCAL_MANIFEST_PATH = Path("tmp/modal/deployment-manifest.json")
+IMAGE_WALL_META_ENDPOINT = os.getenv("IMAGE_WALL_META_ENDPOINT", "https://si-image-wall.pages.dev/api/model-meta")
+IMAGE_WALL_META_SECRET = os.getenv("IMAGE_WALL_META_SECRET", "")
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
@@ -166,7 +170,38 @@ def upload_data():
         print(f"Uploading deployment manifest from {LOCAL_MANIFEST_PATH}...")
         upload.put_file(str(LOCAL_MANIFEST_PATH), "/metadata/deployment-manifest.json")
 
+    publish_manifest_to_image_wall(manifest)
+
     print("Upload complete.")
+
+
+def publish_manifest_to_image_wall(manifest: dict) -> None:
+    if not IMAGE_WALL_META_SECRET:
+        print("Skipping image-wall model-meta publish (IMAGE_WALL_META_SECRET not set).")
+        return
+
+    payload = json.dumps({"manifest": manifest}).encode("utf-8")
+    req = urlrequest.Request(
+        IMAGE_WALL_META_ENDPOINT,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "X-Model-Meta-Secret": IMAGE_WALL_META_SECRET,
+            "User-Agent": "si-image-trainer/1.0 (+https://si-image-wall.pages.dev)",
+        },
+    )
+
+    try:
+        with urlrequest.urlopen(req, timeout=20) as response:
+            status = response.getcode()
+            if status < 200 or status >= 300:
+                raise RuntimeError(f"image-wall model-meta publish failed with status {status}")
+        print(f"Published deployment manifest to image-wall: {IMAGE_WALL_META_ENDPOINT}")
+    except urlerror.HTTPError as exc:
+        raise RuntimeError(f"image-wall model-meta publish failed: HTTP {exc.code}") from exc
+    except urlerror.URLError as exc:
+        raise RuntimeError(f"image-wall model-meta publish failed: {exc}") from exc
 
 
 def build_deployment_manifest() -> dict:
