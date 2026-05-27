@@ -197,11 +197,57 @@ def publish_manifest_to_image_wall(manifest: dict) -> None:
             status = response.getcode()
             if status < 200 or status >= 300:
                 raise RuntimeError(f"image-wall model-meta publish failed with status {status}")
-        print(f"Published deployment manifest to image-wall: {IMAGE_WALL_META_ENDPOINT}")
+        verify_published_manifest(manifest)
+        print(f"Published and verified deployment manifest on image-wall: {IMAGE_WALL_META_ENDPOINT}")
     except urlerror.HTTPError as exc:
         raise RuntimeError(f"image-wall model-meta publish failed: HTTP {exc.code}") from exc
     except urlerror.URLError as exc:
         raise RuntimeError(f"image-wall model-meta publish failed: {exc}") from exc
+
+
+def verify_published_manifest(expected_manifest: dict) -> None:
+    verify_url = IMAGE_WALL_META_ENDPOINT
+    req = urlrequest.Request(
+        verify_url,
+        method="GET",
+        headers={
+            "User-Agent": "si-image-trainer/1.0 (+https://si-image-wall.pages.dev)",
+        },
+    )
+
+    with urlrequest.urlopen(req, timeout=20) as response:
+        status = response.getcode()
+        if status < 200 or status >= 300:
+            raise RuntimeError(f"image-wall model-meta verify failed with status {status}")
+        body = response.read().decode("utf-8")
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("image-wall model-meta verify failed: invalid JSON response") from exc
+
+    stored_manifest = payload.get("manifest")
+    if not isinstance(stored_manifest, dict):
+        raise RuntimeError("image-wall model-meta verify failed: missing manifest in response")
+
+    # Verify a minimal set of lineage keys round-tripped correctly.
+    keys_to_check = [
+        "generated_at_utc",
+        "model_label",
+        "model_sha256",
+        "index_sha256",
+        "trainer_repo_commit",
+        "reference_repo_commit",
+    ]
+    mismatches = [
+        key for key in keys_to_check
+        if stored_manifest.get(key) != expected_manifest.get(key)
+    ]
+    if mismatches:
+        raise RuntimeError(
+            "image-wall model-meta verify failed: mismatch for keys "
+            + ", ".join(mismatches)
+        )
 
 
 def build_deployment_manifest() -> dict:
