@@ -1,0 +1,11 @@
+{
+  "labels": [
+    {
+      "flash_id": "sample_flash_001",
+      "mosaic_id": "PA_1571",
+      "flash_url": "https://si-image-wall.pages.dev/ref/PA/PA_1571.png",
+      "confirmed_at": 1770000000
+    }
+  ],
+  "cursor": 1770000000
+}

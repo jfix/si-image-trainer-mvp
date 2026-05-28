@@ -23,6 +23,83 @@ Not implemented yet:
 
 This keeps Phase A focused on reliable ingestion plumbing before index mutation.
 
+## Phase B implementation status (28 May 2026)
+
+Implemented scaffold:
+
+- `scripts/phase_b_refresh.py`
+
+Current behavior:
+
+1. Pulls crowd-confirmed labels from `/api/export/confirmed` with a persisted cursor.
+2. Downloads flash images to `data/interim/confirmed_flash_images`.
+3. Applies sharpness filter before embedding.
+4. Applies same-`mosaic_id` near-duplicate rejection via cosine similarity.
+5. Writes:
+   - merged manifest: `data/processed/reference_manifest_phase_b.jsonl`
+   - accepted/rejected ledgers under `data/automation/phase_b/`
+   - run summary under `data/automation/phase_b/reports/<run_id>.json`
+6. Optional index build mode:
+   - versioned output: `outputs/indexes_versions/<run_id>/`
+   - atomic pointer file: `outputs/indexes_current.json`
+
+### Run commands
+
+Basic refresh (no index build):
+
+```bash
+LABELLING_SECRET=... \
+python scripts/phase_b_refresh.py --config configs/base.yaml
+```
+
+Refresh + versioned index build + pointer flip:
+
+```bash
+LABELLING_SECRET=... \
+python scripts/phase_b_refresh.py --config configs/base.yaml --build-index
+```
+
+Backfill run from since=0 with bounded batch:
+
+```bash
+LABELLING_SECRET=... \
+python scripts/phase_b_refresh.py --config configs/base.yaml --since 0 --max-labels 200
+```
+
+Offline plumbing test without export API:
+
+```bash
+python scripts/phase_b_refresh.py --config configs/base.yaml --labels-file tmp/sample_labels.json
+```
+
+## Inputs checklist (operator)
+
+Keep these values handy before running automation jobs.
+
+### Required now (Phase A)
+
+- Modal secret name: `si-archive-admin`
+- Secret key in that secret: `LABELLING_SECRET`
+- `LABELLING_SECRET` must match the web app export secret used by:
+   - `GET /api/export/confirmed`
+   - request header: `X-Export-Secret`
+
+### Already used by deployment metadata flow
+
+- `IMAGE_WALL_META_SECRET` (trainer side env var)
+- image-wall Pages secret: `MODEL_META_SECRET`
+- both must have the same value for `/api/model-meta` publish to succeed
+
+### Planned for Phase B (expected additional inputs)
+
+- Canonical reference-library source path/repo (for manifest refresh input)
+- Policy values for quality filters (bbox area threshold, sharpness threshold)
+- Dedup threshold (cosine similarity within the same `mosaic_id`)
+- Publication target for refreshed indexes (where to write/version and pointer key)
+- Inference reload strategy after pointer flip (polling interval vs explicit bounce)
+
+Use this checklist as the single source for required runtime inputs when running or debugging corpus automation.
+
 ## Why this matters
 
 Most retrieval failures in the current system are a **coverage**

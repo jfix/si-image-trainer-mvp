@@ -137,3 +137,38 @@ Important:
 - This Phase A implementation is ingestion plumbing only.
 - It does not yet mutate/publish FAISS indexes automatically.
 - It does not alter model training logic.
+
+## Phase B automation scaffold (corpus refresh)
+
+Phase B script:
+
+- `scripts/phase_b_refresh.py`
+
+What it automates:
+
+- confirmed-label pull with cursor persistence
+- flash-image download
+- quality filtering (sharpness)
+- per-mosaic near-duplicate rejection (cosine threshold)
+- merged manifest output (`reference_manifest_phase_b.jsonl`)
+- optional versioned index build + atomic pointer update
+
+Run (no index build):
+
+```bash
+LABELLING_SECRET=... \
+python scripts/phase_b_refresh.py --config configs/base.yaml
+```
+
+Run (build versioned indexes and update pointer):
+
+```bash
+LABELLING_SECRET=... \
+python scripts/phase_b_refresh.py --config configs/base.yaml --build-index
+```
+
+Local/offline smoke test (no export API call):
+
+```bash
+python scripts/phase_b_refresh.py --config configs/base.yaml --labels-file tmp/sample_labels.json
+```
