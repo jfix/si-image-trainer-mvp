@@ -87,3 +87,53 @@ Reports are written to `outputs/reports/`.
 - add learned re-ranking from labeled positives and hard negatives
 - add calibrated probability estimates from a labeled query set
 - add mosaic-region detection or rectification when enough training data exists
+
+## Modal Phase A automation (ingestion plumbing)
+
+Phase A is now started with a Modal job scaffold:
+
+- script: `scripts/modal_phase_a.py`
+- app name: `si-corpus-refresh`
+- state volume: `si-corpus-refresh-state`
+- cursor store: `si-corpus-refresh-cursor`
+
+Current behavior:
+
+- fetches confirmed labels from `GET /api/export/confirmed?since=...`
+- uses a persistent cursor in Modal Dict
+- stages labels and run summaries into a Modal Volume
+- optionally downloads flash images for downstream processing
+
+Run once:
+
+```bash
+modal run scripts/modal_phase_a.py::run_once
+```
+
+Backfill from zero cursor:
+
+```bash
+modal run scripts/modal_phase_a.py::run_once --since 0
+```
+
+Inspect saved cursor/state:
+
+```bash
+modal run scripts/modal_phase_a.py::show_state
+```
+
+Deploy scheduled daily job:
+
+```bash
+modal deploy scripts/modal_phase_a.py
+```
+
+Required secret in Modal:
+
+- `si-archive-admin` containing `LABELLING_SECRET`
+
+Important:
+
+- This Phase A implementation is ingestion plumbing only.
+- It does not yet mutate/publish FAISS indexes automatically.
+- It does not alter model training logic.

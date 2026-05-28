@@ -4,6 +4,25 @@ The nightly job that pulls crowd-verified labels from the web app and
 grows the FAISS reference corpus. This is Phase 2 of the labelling
 system roadmap and the single biggest lever for retrieval accuracy.
 
+## Implementation status (28 May 2026)
+
+Implemented in this repo:
+
+- `scripts/modal_phase_a.py` with Modal app `si-corpus-refresh`
+- persistent cursor handling via Modal Dict (`si-corpus-refresh-cursor`)
+- daily scheduled ingestion function (`ingest_confirmed_labels`)
+- run summaries + staged labels persisted to Modal Volume (`si-corpus-refresh-state`)
+- optional flash-image download for downstream quality filtering/index updates
+
+Not implemented yet:
+
+- quality filters from this document
+- near-duplicate checks
+- atomic FAISS publication + pointer flip
+- inference reload orchestration
+
+This keeps Phase A focused on reliable ingestion plumbing before index mutation.
+
 ## Why this matters
 
 Most retrieval failures in the current system are a **coverage**
