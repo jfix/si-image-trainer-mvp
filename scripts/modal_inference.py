@@ -34,7 +34,7 @@ INDEX_DIR  = DATA_DIR / "indexes"
 DETECTOR_PATH = DATA_DIR / "detector" / "mosaic_detector_v3.pt"
 MANIFEST_PATH = DATA_DIR / "metadata" / "deployment-manifest.json"
 
-LOCAL_MODEL_DIR    = Path("outputs/models/exp17")
+LOCAL_MODEL_DIR    = Path("outputs/models/exp20")
 LOCAL_INDEX_DIR    = Path("outputs/indexes")
 LOCAL_DETECTOR_PATH = Path("outputs/models/mosaic_detector_v3.pt")
 LOCAL_MANIFEST_PATH = Path("tmp/modal/deployment-manifest.json")
