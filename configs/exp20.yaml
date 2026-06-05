@@ -1,0 +1,8 @@
+extends: base.yaml
+
+embedding:
+  type: pretrained
+  model_name: outputs/models/exp20
+
+paths:
+  index_dir: outputs/indexes/exp20

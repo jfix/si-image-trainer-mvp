@@ -8,6 +8,8 @@ from pathlib import Path
 
 MANIFEST      = Path("data/processed/reference_manifest.jsonl")
 FLASH_LABELS  = Path("data/processed/flash_labels.jsonl")
+PHASE_B_LABELS = Path("data/automation/phase_b/last_accepted.jsonl")
+PHASE_B_IMAGES = Path("data/interim/confirmed_flash_images")
 OUTPUT_ZIP    = Path("outputs/colab_training_data.zip")
 
 
@@ -55,24 +57,34 @@ def main() -> None:
         manifest_content = "\n".join(json.dumps(r) for r in remapped)
         zf.writestr("reference_manifest.jsonl", manifest_content)
 
-        # Labeled flash images
+        # Labeled flash images — merge curated flash_labels.jsonl + phase_b crowd-confirmed images.
+        # Deduplicate by image filename so the same photo isn't added twice.
+        all_flash_rows: list[dict] = []
         if FLASH_LABELS.exists():
-            flash_rows = [json.loads(l) for l in FLASH_LABELS.read_text().splitlines() if l.strip()]
-            flash_remapped = []
-            missing_flash = 0
-            for r in flash_rows:
-                p = Path(r["image_path"])
-                if not p.exists():
-                    missing_flash += 1
-                    continue
-                rel = f"flash/{p.name}"
-                zf.write(str(p), arcname=f"flash_images/{rel}")
-                flash_remapped.append({**r, "image_path": rel})
-            flash_manifest = "\n".join(json.dumps(r) for r in flash_remapped)
-            zf.writestr("flash_labels.jsonl", flash_manifest)
-            print(f"\nAdded {len(flash_remapped)} labeled flash images ({missing_flash} missing)")
-        else:
-            print("\nNo flash_labels.jsonl found, skipping")
+            all_flash_rows += [json.loads(l) for l in FLASH_LABELS.read_text().splitlines() if l.strip()]
+        if PHASE_B_LABELS.exists():
+            all_flash_rows += [json.loads(l) for l in PHASE_B_LABELS.read_text().splitlines() if l.strip()]
+
+        seen_filenames: set[str] = set()
+        flash_remapped: list[dict] = []
+        missing_flash = 0
+        for r in all_flash_rows:
+            p = Path(r["image_path"])
+            if not p.exists():
+                missing_flash += 1
+                continue
+            if p.name in seen_filenames:
+                continue
+            seen_filenames.add(p.name)
+            rel = f"flash/{p.name}"
+            zf.write(str(p), arcname=f"flash_images/{rel}")
+            flash_remapped.append({**r, "image_path": rel})
+
+        flash_manifest = "\n".join(json.dumps(r) for r in flash_remapped)
+        zf.writestr("flash_labels.jsonl", flash_manifest)
+        n_curated = sum(1 for r in flash_remapped if "flash_id" not in r)
+        n_phase_b  = len(flash_remapped) - n_curated
+        print(f"\nAdded {len(flash_remapped)} flash images ({missing_flash} missing, {n_curated} curated + {n_phase_b} phase-b)")
 
         detector_path = Path("outputs/models/mosaic_detector_v3.pt")
         if detector_path.exists():
