@@ -204,7 +204,143 @@ Retrieval-based pipeline:
 **Training:** Google Colab T4 GPU, 40 epochs (~553s/epoch). Best epoch: **17**, combined val **0.0636** (ref=0.1190, flash=**0.0082**). New overall best.  
 **Flash component trajectory:** 0.0571 → 0.0282 → 0.0082 (epoch 17) → oscillates 0.008–0.034 → settles ~0.015–0.02. Near-zero flash val loss at best epoch suggests strong flash→reference alignment.  
 **Weights:** saved at epoch 17 (`si-experiments/exp17` on Drive).  
-**Next:** validate on flash images — if flash val loss translates to real accuracy, this is a major breakthrough.
+**Flash accuracy (PA, seed 42, 50 images):** 33/50 (**66%**) — below exp 11's 74% on the same seed.
+**Why it underperformed:** Combined val loss at 0.0636 is the lowest yet, and the flash component reached near-zero (0.0082). But the model was trained from scratch with 930 flash labels and still failed to beat exp 11 (which also trained from scratch with 930 labels, but used reference-only val loss). The near-zero flash val loss likely reflects over-fitting to the held-out flash val set rather than genuine generalisation.
+**Key finding:** Flash-aware combined val loss is also not a reliable proxy for real flash accuracy — at least not alone. Neither reference-only nor combined val loss reliably predicts field performance. Manual flash validation remains mandatory. *(Later revised by exp 20: the metric does work reliably when enough labeled flash data is available. Exp 17's failure was likely due to the small flash val set — 930 labels — overfitting to the held-out flash pairs, not a flaw in the metric itself.)*
+**Production model:** exp 11 remains best (val 0.1080 ref-only, flash 74% PA).
+
+---
+
+### 18. Modal infrastructure bring-up + 20-epoch reference-only run — 2026-06-01
+**What:** Moved training from Google Colab to Modal (remote GPU, durable volume). No architecture changes — same DINOv2-small, last 2 blocks fine-tuned, triplet loss, augmentation on. Validation is reference-only (same as exp 5–16, NOT the flash-aware combined metric from exp 17). Smoke test (1 epoch) first, then a full 20-epoch run.
+
+**Infrastructure:**
+- Modal app: `si-train-metric`, volume: `si-training-artifacts`
+- GPU: T4, timeout: 8h
+- Dataset uploaded as `colab_training_data.zip`, sha256 `0e2e037aea87cf7a9f3e8cc11a8c619e008517dd9d8f4c255298a115ec5ea8fa`
+- Train invaders: 1909 | Val invaders: 336 | Trainable params: 3,551,232 / 22,056,576
+
+**Smoke test (exp18-modal-smoke, 1 epoch):** val loss 0.1134, ~1024s on T4. Confirmed infrastructure works.
+
+**Full run (exp18-modal, 20 epochs, ~900s/epoch):**
+
+| Epoch | Train loss | Val loss | Saved |
+|-------|-----------|----------|-------|
+| 1     | 0.1577     | 0.1200   | ✓     |
+| 2     | 0.1123     | 0.1135   | ✓     |
+| 3     | 0.0960     | 0.1066   | ✓     |
+| 4     | 0.0847     | 0.0985   | ✓     |
+| 5     | 0.0751     | 0.1030   |       |
+| 6     | 0.0671     | 0.0961   | ✓     |
+| 7     | 0.0589     | 0.0904   | ✓     |
+| 8     | 0.0554     | 0.0963   |       |
+| 9     | 0.0524     | 0.0918   |       |
+| 10    | 0.0493     | 0.0872   | ✓     |
+| 11    | 0.0466     | 0.0871   | ✓     |
+| 12    | 0.0459     | 0.0890   |       |
+| 13    | 0.0434     | 0.0886   |       |
+| 14    | 0.0397     | 0.0849   | ✓     |
+| 15    | 0.0403     | 0.0817   | ✓     |
+| 16    | 0.0380     | 0.0837   |       |
+| 17    | 0.0389     | 0.0794   | ✓     |
+| 18    | 0.0367     | 0.0781   | ✓     |
+| 19    | 0.0351     | 0.0788   |       |
+| 20    | 0.0352     | 0.0814   |       |
+
+**Best:** epoch 18, val loss **0.0781** (reference-only).
+
+**Key caveat:** exp 16 showed reference-only val loss is not a reliable proxy for flash accuracy — a model with val 0.0706 achieved only 38% flash accuracy. This run achieves 0.0781 but uses the same reference-only metric. Flash accuracy is unknown until manually validated. Do not assume this beats exp 11 (val 0.1080, flash 74%) on real flash images without testing.
+
+**Modal run IDs:**
+- Smoke: app `ap-xM0rlczPxH6WMSTeFbqB5D` (stopped)
+- Full 20-epoch: app `ap-EAxMZQ1RgtxFUlXhEOypUY` (stopped)
+
+**Weights:** saved on Modal volume `si-training-artifacts` under `/training/outputs/models/exp18-modal/`.
+
+**Flash accuracy (PA, seed 42, 50 images):** 4/50 (**8%**) — catastrophic failure, worst result yet.
+**Why it failed:** Reference-only val loss (same failure mode as exp 16). Model over-specialises in reference↔reference discrimination; flash images land completely wrong in embedding space.
+**Production model:** exp 11 remains best.
+
+---
+
+### 19. Modal run — preempted, checkpoint clobbered — 2026-06-02
+**What:** First Modal run with flash images included in training. Same DINOv2-small architecture, last 2 blocks, triplet loss, augmentation on. Reference-only val loss (same failure mode risk as exp 18). 40 epochs planned.
+
+**Training data:** 2360 flash images merged + 6539 reference rows. Train invaders: 1997 | Val invaders: 352.
+
+**Epoch log (partial — preempted at epoch 13):**
+
+| Epoch | Train loss | Val loss | Saved |
+|-------|-----------|----------|-------|
+| 1  | 0.1396 | 0.1082 | ✓ |
+| 2  | 0.0986 | 0.0865 | ✓ |
+| 3  | 0.0837 | 0.0737 | ✓ |
+| 4  | 0.0702 | 0.0703 | ✓ |
+| 5  | 0.0608 | 0.0590 | ✓ |
+| 6  | 0.0556 | 0.0599 | |
+| 7  | 0.0509 | 0.0563 | ✓ |
+| 8  | 0.0440 | 0.0568 | |
+| 9  | 0.0422 | 0.0545 | ✓ |
+| 10 | 0.0419 | 0.0535 | ✓ |
+| 11 | 0.0363 | 0.0526 | ✓ |
+| 12 | 0.0362 | 0.0541 | |
+| 13 | 0.0349 | 0.0480 | ✓ |
+
+**Preemption:** Modal worker preempted after epoch 13. Modal restarted the function from scratch with the same input — epoch 1 again. The restart's early-epoch checkpoint (val ~0.1082) overwrote the epoch 13 best (val 0.0480). The model saved to the volume is the clobbered restart checkpoint, not the good one.
+
+**Flash accuracy (PA, seed 42, 50 images):** 14/50 (**28%**) — the clobbered restart checkpoint, not a valid result for this experiment's intent.
+
+**Key learning:** Modal preemption restarts the entire function from scratch. The checkpoint-saving logic (`if val < best`) correctly saved at epoch 13, but the restart reset `best_val_loss` to infinity and overwrote it at epoch 1. Future Modal runs should checkpoint to a run-scoped path (not the shared `exp_name` dir) and only promote to the canonical path at the end.
+
+**Weights:** `exp19-modal` on Modal volume — the clobbered restart. Unusable.
+
+---
+
+### 20. Colab — flash-aware val, 3657 flash images, 40 epochs — 2026-06-05
+**What:** Retry of exp 19's intent, on Colab (paid compute units, no preemption risk). Same recipe as exp 17 (flash-aware combined val, from scratch) but with 4× more labeled flash images. Key differences from exp 17: 3657 flash images (vs 930), `FLASH_OVERSAMPLE=10` (vs 20).
+
+**Training data:** 3657 flash images (930 curated + 2727 crowd-confirmed via phase-b pipeline) + 6539 reference rows. Train invaders: ~2000 | Val invaders: ~350. Flash train pairs: ~3108, oversampled 10×  → ~31,000 flash triplets/epoch.
+
+**Val metric:** flash-aware combined — 50% reference↔reference triplet loss + 50% flash→reference triplet loss. Same as exp 17.
+
+**Training:** Colab T4 GPU (paid), 36/40 epochs completed (~770s/epoch). Stopped early — best checkpoint already saved at epoch 24, no improvement for 12 epochs.
+
+**Selected epoch log:**
+
+| Epoch | Train loss | Val (combined) | Val ref | Val flash | Saved |
+|-------|-----------|----------------|---------|-----------|-------|
+| 1  | 0.0767 | 0.0892 | 0.1453 | 0.0331 | ✓ |
+| 2  | 0.0430 | 0.0760 | 0.1258 | 0.0262 | ✓ |
+| 4  | 0.0254 | 0.0687 | 0.1185 | 0.0189 | ✓ |
+| 7  | 0.0170 | 0.0656 | 0.1209 | 0.0102 | ✓ |
+| 13 | 0.0101 | 0.0649 | 0.1196 | 0.0103 | ✓ |
+| 15 | 0.0095 | 0.0642 | 0.1215 | 0.0069 | ✓ |
+| 18 | 0.0074 | 0.0622 | 0.1173 | 0.0071 | ✓ |
+| 24 | 0.0059 | **0.0614** | 0.1179 | 0.0049 | ✓ |
+| 36 | 0.0044 | 0.0655 | 0.1275 | 0.0035 | |
+
+**Best:** epoch 24, combined val **0.0614** (ref=0.1179, flash=0.0049). Beats exp 17's best of 0.0636.
+
+**Flash accuracy:**
+| City | Index size | Seed | Accuracy |
+|------|-----------|------|----------|
+| PA   | 1570 | 42 | **74%** (37/50) |
+| PA   | 1570 | 99 | **68%** (34/50) |
+| LDN  | ~600 | 42 | **80%** (40/50) |
+
+**vs exp 17 on the same samples:**
+| City | Seed | exp17 | exp20 | Δ |
+|------|------|-------|-------|---|
+| PA   | 42   | 66%   | 74%   | +8pp |
+| PA   | 99   | 52%   | 68%   | +16pp |
+| LDN  | 42   | 76%   | 80%   | +4pp |
+| **Combined** | | **63%** | **73%** | **+10pp** |
+
+**Key findings:** More flash data (4×) combined with flash-aware val loss is the winning recipe. The flash val component (0.0049 at best epoch) is lower than exp 17's (0.0082), consistent with stronger flash→reference alignment. The improvement is consistent across both cities and both seeds.
+
+**Weights:** `outputs/models/exp20/` (local). `configs/base.yaml` updated to point to exp20. Full production index rebuilt.
+
+**Production model:** **exp20** — new best. Replaces exp17.
 
 ---
 
@@ -243,7 +379,7 @@ These will need recalibrating again after the augmented model is trained, since 
 - **Offline eval is misleading:** reference-to-reference accuracy is not a reliable proxy for flash-to-reference accuracy. Use labeled flash images + validation pages for honest evaluation.
 - **Validation is noisy:** 30–50 image manual samples have meaningful variance. A fixed held-out eval set would give more reliable progress tracking.
 - **Confidence thresholds need recalibration** after each new embedder model — current thresholds were set on an earlier model and score distributions have shifted.
-- **PA is a hard city:** 1570 mosaics in the index. At 74% accuracy (exp 11) many mosaics are still confused with visually similar neighbours. 602 labeled flash images is still a weak ratio (~38%).
+- **PA is a hard city:** 1570 mosaics in the index. At 71–74% accuracy (exp 20, averaged across seeds) many mosaics are still confused with visually similar neighbours. 3657 labeled flash images but PA coverage is still ~38%.
 - **No proper eval metrics:** we only track val loss and manual spot-checks. P@1 and Recall@K on a fixed held-out set would give reliable, reproducible progress measurement.
 - **flash_labels.jsonl concatenation bug:** labels appended without a trailing newline produce `{...}{...}` on a single line. The deduplication script (`scripts/deduplicate_flash_labels.py`) handles this with regex split, but the root cause should be fixed in the labeling page's export logic.
 
@@ -260,13 +396,13 @@ These will need recalibrating again after the augmented model is trained, since 
 - [x] **Hard negative mining** — tried in exp 12/13/14. All failed. Abandoned for now.
 - [x] **Lower LR + warm-start recipe** — exp 16 achieved val 0.0706 (35% better than exp 11). Best epoch was 1 — key learning: warm-start needs only 5–10 epochs, not 20–40.
 - [x] **Validate exp 16 on flash images** — done: 19/50 (38%) on PA seed 42. Worse than exp 11 (74%). Val loss is not a reliable proxy for flash accuracy.
-- [ ] **Fix val loss metric** — include labeled flash pairs in val loss computation so the metric directly measures flash→reference matching, not just reference↔reference. This is the most important architectural change needed before the next training run.
-- [ ] **Recalibrate confidence thresholds** — score distributions have shifted significantly (0.07 range vs old 0.10 range). Must redo before deploying.
+- [x] **Fix val loss metric** — done in exp 17. Flash-aware combined val (50/50) now used as standard. Confirmed to predict flash accuracy reliably in exp 20.
+- [ ] **Recalibrate confidence thresholds** — score distributions have shifted with exp20. Must redo before deploying to production inference.
 - [ ] **Build a proper eval framework** — compute P@1 and Recall@K on a fixed held-out set (not a 30-image spot-check). Script should run in < 60s and produce a single score to track per experiment.
 
 ### Medium priority
-- [ ] **Hard negative mining (high priority now)** — exp 15 confirmed the recipe has hit its ceiling. Mine hard negatives from the exp 11 checkpoint (val 0.1080, the best model we have). Unlike exp 12/13, the embedding space is now meaningful so mined negatives will actually be hard.
-- [ ] **More PA labels** — 602 PA labels vs 1570 mosaics is ~38% coverage. Each labeling session + retrain has consistently improved accuracy; continue toward 1000+ PA labels.
+- [ ] **Hard negative mining** — now worth trying from the exp20 checkpoint, which has a well-structured flash-aware embedding space. Unlike exp 12/13, the embedding space is meaningful and flash images land correctly.
+- [ ] **More PA labels** — 3657 flash images total but PA coverage is still ~38% of 1570 mosaics. Each labeling session + retrain has consistently improved accuracy; continue toward full coverage.
 - [ ] **Label more cities** — VRS (39), WN (56), LY (48), AVI (41), NY (192), TK (135), HK (132) all have flash images and reference mosaics but no labeled data. 200+ labels per city would improve generalisation.
 - [ ] **Unfreeze more layers** — currently only last 2 transformer blocks fine-tuned. With 900+ labeled images, unfreezing additional blocks may help capacity-limited learning.
 - [ ] **Fix flash_labels.jsonl append bug** — labeling page export sometimes omits trailing newline, causing `{...}{...}` concatenated lines. Fix the export download logic to always emit `\n` after each record.

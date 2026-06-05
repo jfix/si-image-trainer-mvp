@@ -11,7 +11,7 @@ paths:
 
 embedding:
   type: pretrained
-  model_name: outputs/models/exp17
+  model_name: outputs/models/exp20
 
 retrieval:
   top_n: 12
