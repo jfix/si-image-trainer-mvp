@@ -66,6 +66,7 @@ app = modal.App("si-inference", image=image)
     gpu="T4",
     volumes={str(DATA_DIR): vol},
     min_containers=0,
+    max_containers=3,
     timeout=60,
 )
 class InferenceService:
