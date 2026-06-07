@@ -86,9 +86,9 @@ def main() -> None:
         n_phase_b  = len(flash_remapped) - n_curated
         print(f"\nAdded {len(flash_remapped)} flash images ({missing_flash} missing, {n_curated} curated + {n_phase_b} phase-b)")
 
-        detector_path = Path("outputs/models/mosaic_detector_v3.pt")
+        detector_path = Path("outputs/models/mosaic_detector_v4.pt")
         if detector_path.exists():
-            zf.write(detector_path, arcname="mosaic_detector_v3.pt")
+            zf.write(detector_path, arcname="mosaic_detector_v4.pt")
             print(f"Added detector weights ({detector_path.stat().st_size / 1_000_000:.1f} MB)")
         else:
             print("Warning: detector weights not found, skipping")

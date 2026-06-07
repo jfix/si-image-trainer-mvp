@@ -36,6 +36,12 @@ Retrieval-based pipeline:
 **Weights:** `outputs/models/mosaic_detector_v3.pt`  
 **Wired into pipeline:** yes — detector crops the flash image before embedding. Falls back to full image if nothing detected. `"used_crop": true` appears in diagnostics.
 
+**Detector v4 — 2026-06-07:**  
+A "bad crop" flag button was added to the si-image-wall verify page. Users tap it whenever the top-5 candidates are clearly wrong due to a bad detection crop. 195 images flagged in the first session (PA, LDN, ROM, TK, VRS, BXL, GRN, GNV, WN, MARS, BAB, PAU), annotated in Label Studio and merged with the existing dataset. Dataset grew from 279 → 483 images (full re-split 80/20: 386 train, 97 val). Trained on MPS (Apple M1), 100 epochs, patience=20.  
+**Result:** best epoch 89, mAP50 **0.949** (vs v3's 0.981). Lower metric likely reflects harder examples from the bad-crop batch and a reshuffled val set rather than a regression in detection quality.  
+**Weights:** `outputs/models/mosaic_detector_v4.pt`  
+**Wired into pipeline:** update `prepare_colab_data.py` done — next Colab zip will bundle v4.
+
 ---
 
 ### 3. DINOv2 pretrained (no fine-tuning) — 2026-05-05
