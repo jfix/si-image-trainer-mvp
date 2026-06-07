@@ -132,14 +132,24 @@ def main() -> None:
         if i % 100 == 0:
             print(f"  {i}/{len(labels)} processed — {len(accepted)} accepted so far")
 
+    # Merge with existing entries so incremental runs accumulate rather than overwrite.
+    # Full rebuild (--since 0) still works correctly — existing entries get replaced by
+    # the freshly validated ones fetched from the API.
+    if OUTPUT_JSONL.exists() and since > 0:
+        existing = [json.loads(l) for l in OUTPUT_JSONL.read_text().splitlines() if l.strip()]
+        new_ids = {r["flash_id"] for r in accepted}
+        merged = [r for r in existing if r["flash_id"] not in new_ids] + accepted
+    else:
+        merged = accepted
+
     OUTPUT_JSONL.write_text(
-        "\n".join(json.dumps(r) for r in accepted) + "\n", encoding="utf-8"
+        "\n".join(json.dumps(r) for r in merged) + "\n", encoding="utf-8"
     )
     CURSOR_FILE.write_text(
         json.dumps({"since": cursor, "updated_at": "auto"}) + "\n", encoding="utf-8"
     )
 
-    print(f"\nDone: {len(accepted)} accepted, {rejected} rejected")
+    print(f"\nDone: {len(accepted)} accepted, {rejected} rejected ({len(merged)} total in jsonl)")
     print(f"Images: {IMAGES_DIR}")
     print(f"Labels: {OUTPUT_JSONL}")
 
