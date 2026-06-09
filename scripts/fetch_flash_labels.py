@@ -100,6 +100,13 @@ def main() -> None:
             rejected += 1
             continue
 
+        # Rejected candidates = everything the model proposed that wasn't confirmed
+        raw_candidates = item.get("candidates", [])
+        rejected_candidates = [
+            c["mosaic_id"] for c in raw_candidates
+            if isinstance(c, dict) and c.get("mosaic_id") and c["mosaic_id"] != mosaic_id
+        ]
+
         target = IMAGES_DIR / f"{flash_id}.jpg"
         if not target.exists():
             try:
@@ -127,6 +134,7 @@ def main() -> None:
             "image_path": str(target),
             "role": "flash-reference",
             "flash_id": flash_id,
+            "rejected_candidates": rejected_candidates,
         })
 
         if i % 100 == 0:
