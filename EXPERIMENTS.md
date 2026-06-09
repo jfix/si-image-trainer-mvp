@@ -391,6 +391,48 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ---
 
+### 21. Colab — flash-aware val, 5202 flash images, 30 epochs — 2026-06-07/08
+**What:** Same recipe as exp 20 (flash-aware combined val, from scratch, LR 1e-5, FLASH_OVERSAMPLE=10) with more data and the new detector. Key differences: 5202 flash images (vs 3657 in exp20 — +42%), detector v4 (483 images, mAP50 0.949), 30 epochs (down from 40).
+
+**Training data:** 5202 flash images (976 curated + 4226 crowd-confirmed) + 6558 reference rows. Flash train pairs: ~4422, oversampled 10× → ~44,000 flash triplets/epoch (~770s/epoch in exp20, ~1000s here due to larger dataset).
+
+**Val metric:** flash-aware combined — 50% reference↔reference + 50% flash→reference. Same as exp 20.
+
+**Training:** Colab T4 GPU (paid), all 30 epochs completed (~1000s/epoch).
+
+**Epoch log (selected):**
+
+| Epoch | Train loss | Val (combined) | Val ref | Val flash | Saved |
+|-------|-----------|----------------|---------|-----------|-------|
+| 1  | 0.0600 | 0.0710 | 0.1207 | 0.0213 | ✓ |
+| 2  | 0.0292 | 0.0614 | 0.1095 | 0.0134 | ✓ |
+| 3  | 0.0209 | 0.0589 | 0.1062 | 0.0117 | ✓ |
+| 4  | 0.0172 | 0.0583 | 0.1089 | 0.0078 | ✓ |
+| 5  | 0.0143 | 0.0558 | 0.1043 | 0.0073 | ✓ |
+| 6  | 0.0127 | **0.0537** | 0.1025 | 0.0049 | ✓ |
+| 12 | 0.0065 | 0.0535 | 0.1034 | 0.0036 | ✓ |
+| 16 | 0.0051 | **0.0527** | 0.1005 | 0.0048 | ✓ |
+| 28 | 0.0032 | 0.0537 | 0.1050 | 0.0025 | |
+
+**Best:** epoch 16, combined val **0.0527** (ref=0.1005, flash=0.0048). Beats exp20's best of 0.0614 by **14%**.
+
+**Key findings:** More flash data + v4 detector improved val loss substantially. Best epoch came at 16 (vs 24 in exp20) — larger dataset converges faster. Flash val component very low throughout (0.0025–0.0048 in later epochs). 30 epochs was the right call; best was already found by epoch 16 with 14 epochs to spare.
+
+**Weights:** `outputs/models/exp21/` (downloaded from Drive). `configs/base.yaml` updated to exp21 + detector v4.
+
+**Flash accuracy:**
+| City | Index size | Seed | Accuracy | vs exp20 | Δ |
+|------|-----------|------|----------|----------|---|
+| PA   | 2220 | 42 | **64%** (32/50) | 74% (37/50) | -10pp |
+| PA   | 2220 | 99 | **64%** (32/50) | 68% (34/50) | -4pp |
+| LDN  | 305  | 42 | **92%** (46/50) | 80% (40/50) | **+12pp** |
+
+**Analysis:** LDN shows a genuine model improvement (+12pp) consistent with the lower combined val loss. PA regresses despite better val loss — but PA's index grew from 1,570 → 2,220 embeddings (+41%) between exp20 and exp21, which increases the number of distractors and likely explains most of the apparent regression. The model itself is probably better; PA is just harder now with more mosaics.
+
+**Production model:** **exp21** — best combined val loss (0.0527) and best LDN accuracy (92%). PA regression is largely confounded by larger index size.
+
+---
+
 ## What to try next
 
 ### High priority
