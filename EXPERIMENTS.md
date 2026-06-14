@@ -433,6 +433,25 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ---
 
+## exp22 — Flash hard negatives — 2026-06-14
+
+**What:** Same recipe as exp21 with one addition: rejected candidates from the verify UI used as hard negatives for flash triplets instead of random negatives. 4,825 labeled flash images with avg 4.0 rejected candidates each (~19,262 hard neg pairs). 3,575 flash train pairs (2,888 with hard negatives), 630 val pairs. Trained from scratch on Colab T4.
+
+**Training:** Session disconnected twice mid-run. Resume via `START_EPOCH`/`WARMSTART_FROM` worked correctly (with fix for `initial_lr` KeyError on scheduler resume). Best epoch: 15, combined val **0.0607** (ref=0.1157, flash=0.0057). Did not beat exp21's baseline of 0.0527 — plateaued from epoch 13 onward.
+
+**Flash accuracy:**
+| City | Seed | exp21 | exp22 | Δ |
+|------|------|-------|-------|---|
+| PA   | 42   | 64% (32/50) | 34% (17/50) | -30pp |
+| PA   | 99   | 64% (32/50) | 42% (21/50) | -22pp |
+| LDN  | 42   | 92% (46/50) | 72% (36/50) | -20pp |
+
+**Analysis:** Clear regression across all cities. The hard negatives approach hurt rather than helped — both val loss and flash accuracy are worse than exp21. Likely cause: hard negatives from the verify UI are noisy (rejected candidates aren't necessarily visually similar confusers), which may have distorted the embedding space. `configs/base.yaml` reverted to exp21.
+
+**Production model:** **exp21** (unchanged).
+
+---
+
 ## What to try next
 
 ### High priority
