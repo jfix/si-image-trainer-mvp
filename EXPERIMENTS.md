@@ -452,6 +452,27 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ---
 
+## exp23 — InfoNCE + projection head — 2026-06-14
+
+**What:** Replaced triplet margin loss with InfoNCE (NT-Xent) with in-batch negatives (~63 per anchor at batch=64). Frozen DINOv2 backbone + trainable projection head MLP (384→512→256). Hard negatives from verify UI phased in after epoch 8 and cleaned (dropped if cosine similarity to positive ≥ 0.90). Checkpointed on R@1 retrieval recall instead of val loss. 40 epochs planned; stopped at 24 due to plateau.
+
+**Training:** Best at epoch 10, R@1=0.776 on 630 held-out flash images. Plateaued from epoch 10 onward despite loss still slowly decreasing. Epochs ~17 min (vs ~30 min for exp22) due to frozen backbone. Hard neg epochs (8+) ~20 min due to extra reference embedding pass.
+
+**Flash accuracy:**
+| City | Seed | exp21 | exp23 | Δ |
+|------|------|-------|-------|---|
+| PA   | 42   | 64% (32/50) | 44% (22/50) | -20pp |
+| PA   | 99   | 64% (32/50) | 52% (26/50) | -12pp |
+| LDN  | 42   | 92% (46/50) | 90% (45/50) | -2pp |
+
+**Analysis:** Big improvement over exp22 (+10pp PA, +18pp LDN), and nearly matches exp21 on LDN. PA still lags exp21 by 12–20pp. Likely cause: frozen backbone lacks the capacity for the harder PA cases that exp21's fine-tuned blocks handled. InfoNCE loss itself appears sound — the LDN result confirms it. Next: try `PROJ_HEAD=False` (InfoNCE + fine-tuned backbone) to combine the better loss with exp21's architecture.
+
+**Weights:** `outputs/models/exp23/` (projection_head.pt only — backbone unchanged). `configs/base.yaml` reverted to exp21.
+
+**Production model:** **exp21** (unchanged).
+
+---
+
 ## What to try next
 
 ### High priority

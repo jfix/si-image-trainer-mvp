@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from si_image_trainer.utils.image import normalize_vector, open_image, resize_gray, resize_rgb
@@ -66,7 +68,50 @@ class PretrainedEmbedder:
         return normalize_vector(cls_token.cpu().numpy().astype(np.float32))
 
 
-def make_embedder(config: dict) -> BaselineEmbedder | PretrainedEmbedder:
+class ProjectionHeadEmbedder:
+    def __init__(self, model_name: str, projection_head_path: str) -> None:
+        import torch
+        import torch.nn as nn
+        from transformers import AutoImageProcessor, AutoModel
+        import json
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._processor = AutoImageProcessor.from_pretrained(model_name)
+        self._backbone = AutoModel.from_pretrained(model_name)
+        self._backbone.eval()
+        self._backbone.to(self._device)
+
+        head_path = Path(projection_head_path)
+        cfg = json.loads((head_path.parent / "head_config.json").read_text())
+        self._head = nn.Sequential(
+            nn.Linear(cfg["in_dim"], 512),
+            nn.GELU(),
+            nn.Linear(512, cfg["out_dim"]),
+        )
+        state = torch.load(head_path, map_location=self._device)
+        state = {k.removeprefix("net."): v for k, v in state.items()}
+        self._head.load_state_dict(state)
+        self._head.eval()
+        self._head.to(self._device)
+        self._torch = torch
+
+    def embed_path(self, image_path: str) -> np.ndarray:
+        return self.embed_image(open_image(image_path))
+
+    def embed_image(self, image) -> np.ndarray:
+        inputs = self._processor(images=image, return_tensors="pt")
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
+        with self._torch.no_grad():
+            cls = self._backbone(**inputs).last_hidden_state[:, 0]
+            emb = self._head(cls).squeeze()
+        return normalize_vector(emb.cpu().numpy().astype(np.float32))
+
+
+def make_embedder(config: dict) -> BaselineEmbedder | PretrainedEmbedder | ProjectionHeadEmbedder:
+    if config.get("type") == "pretrained_with_head":
+        return ProjectionHeadEmbedder(
+            model_name=config.get("model_name", "facebook/dinov2-small"),
+            projection_head_path=config["projection_head_path"],
+        )
     if config.get("type") == "pretrained":
         return PretrainedEmbedder(model_name=config.get("model_name", "dinov2_vits14"))
     return BaselineEmbedder(
