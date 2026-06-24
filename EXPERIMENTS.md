@@ -473,6 +473,41 @@ These will need recalibrating again after the augmented model is trained, since 
 
 ---
 
+## exp24-local — InfoNCE + fine-tuned backbone, local MPS validation — 2026-06-24
+
+**Why:** exp24 (InfoNCE + cleaned hard negs + *fine-tuned* backbone — the logical combination of exp23's loss with exp21's architecture) never completed: it hung in Colab on the first batch. Rather than fight Colab, the recipe was ported to a small, fast, local harness (`scripts/local_infonce.py`, runs on Apple MPS) to validate the hard-negative approach cheaply before scaling.
+
+**Setup:** PA+LDN subset, 150 invaders (90 PA + 60 LDN) selected **at random** (selecting by most-flash saturated R@1 at 0.96 — too easy). Held-out flash evaluated against a **1,200-invader reference bank** (distractors) for a discriminative R@1. `hardR@1` = R@1 restricted to confusable flash (those the verify UI gave rejected candidates). DINOv2-small, last 4 blocks fine-tuned, InfoNCE with in-batch negatives + same-invader masking, hard negs cleaned (drop if cosine-to-positive ≥ 0.90) and phased in from epoch 3. Crops pre-computed once and cached to disk; batch 32; ~2 min/epoch; peak RAM ~4–6 GB (bounded by batch, not dataset).
+
+**Result (seed 42, A = no hard negs, B = + cleaned hard negs):**
+| metric | A baseline | B +hardneg | Δ |
+|--------|-----------|-----------|---|
+| best R@1     | 0.898 | 0.916 | **+1.8pp** |
+| best hardR@1 | 0.922 | 0.938 | **+1.6pp** |
+
+Epochs 1–2 (negs off) match within ±0.6% (MPS run-to-run noise is small); after negs phase in, B ≥ A in 5 of 6 epochs.
+
+**Multi-seed confirmation (4 seeds, best R@1):**
+| seed | A | B | Δ |
+|------|------|------|------|
+| 42 | 0.898 | 0.916 | +1.8pp |
+| 1  | 0.916 | 0.922 | +0.6pp |
+| 7  | 0.916 | 0.909 | −0.6pp |
+| 13 | 0.922 | 0.908 | −1.3pp |
+| **mean** | | | **+0.1pp** |
+
+B beat A in only 2/4 seeds; mean Δ ≈ 0 (range −1.3 to +1.8pp), all within ~1 standard error (n≈150). A `drop-cos` {0.85/0.95} / `hardneg-start` {5} sweep on seed 42 moved nothing (+1.2 to +1.8pp, tightly clustered).
+
+**Verdict:** the seed-42 +1.8pp was **noise**. Cleaned, uniformly-applied verify-UI hard negatives give **no reliable improvement** — but, unlike exp22, also **no catastrophic regression** (worst seed −1.3pp vs exp22's −12 to −20pp). The cleaning prevents the disaster; it doesn't buy a win. **Not worth scaling as-is.**
+
+**Root cause + next direction (rank-aware hard negatives):** `flash_labels.jsonl` flattens the verify signal to `rejected_candidates` (a bag of mosaic_ids, no rank/score), so all rejected candidates were treated equally. But the gold is the *rank*: across 200 confirmed cases, the correct answer was **not rank-1 in 29%** (15% rank-2, 7% rank-3, …) — these "it's the second/third one" cases identify the *specific* confuser that outranked the truth (recoverable from si-image-wall D1 `candidates_json` + `labels`, which we discarded). Next experiment: mine hard negatives **only from model-error cases** using **only the candidate(s) that outranked the correct answer**, trained with a **pairwise margin/ranking loss** (`sim(flash, correct) > sim(flash, confuser) + margin`). Bonus: the error cases double as a naturally-hard eval set, fixing the 0.90+ baseline saturation that made this A/B insensitive.
+
+**Harness:** `scripts/local_infonce.py` (reusable, MPS, ~2 min/epoch, bounded RAM). Validated that the fine-tuned-backbone loop runs clean locally — the exp24 Colab hang was infra, not the recipe.
+
+**Infra win:** the fine-tuned-backbone loop runs clean locally (no hang, fast, bounded memory), which is what blocked exp24 in Colab. The harness is reusable for fast hard-negative iteration.
+
+---
+
 ## What to try next
 
 ### High priority
