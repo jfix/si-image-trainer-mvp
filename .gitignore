@@ -18,6 +18,7 @@ data/interim/*
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/flash_labels.jsonl
+!data/processed/flash_ranked.jsonl
 data/detector/
 
 outputs/

@@ -508,6 +508,20 @@ B beat A in only 2/4 seeds; mean Δ ≈ 0 (range −1.3 to +1.8pp), all within ~
 
 ---
 
+## exp24-rank — rank-aware hard negatives from verify errors — 2026-06-25
+
+**Idea:** the verify UI's most valuable signal is *which rank* the user picked. When the correct answer wasn't rank-1 ("it's the second/third one"), the candidate(s) ranked **above** it are the exact confusers the production model wrongly preferred — clean, targeted hard negatives. exp22/exp24-local used the rank-less `rejected_candidates` bag and got ≈0; this recovers the rank from si-image-wall D1 (`tasks.candidates_json` is score-ordered + `labels.mosaic_id` is correct) via `scripts/export_ranked_labels.py` → `data/processed/flash_ranked.jsonl`.
+
+**Data:** 6,335 confirmed verify cases — correct answer was rank-1 in 69%, **rank ≥ 2 in 31%** (rank-2 15%, rank-3 8%, rank-4 5%, rank-5 4%). Locally trainable: **1,492 error cases / 2,865 (flash, outranking-confuser) pairs**, PA-dominated (1,551) then LDN/MPL/MARS.
+
+**Method:** InfoNCE flash→reference base + a **pairwise margin term** on error cases — `relu(margin − sim(flash, correct) + sim(flash, confuser))` for the candidate that outranked the truth (`scripts/local_rank.py`). Eval = R@1 on **held-out error cases** vs a 1,200-invader bank — a properly sensitive metric (baseline ~0.71, not the saturated 0.96 of random flash).
+
+**Result (seed 42, PA+LDN, 309 held-out error cases):** A (InfoNCE) best errR@1 **0.841** → B (+ rank margin) **0.848** (**+0.6pp**). B ≥ A in **all 8 epochs** (every rank-on epoch positive) — consistently right-direction, unlike exp24-local's coin-flip — but the magnitude is within 1 SE (~2.1pp at n=309), so **not confirmed on one seed**. Baseline climbs 0.71→0.84 (references teach the pattern), and the margin term (`margin=0.2, λ=1.0`) goes silent once `correct > confuser + 0.2` — likely too gentle.
+
+**Status:** the insight is now usable infrastructure (rank-aware dataset + sensitive eval + pairwise trainer). Multi-seed confirmation + a `margin`/`λ` sweep in progress to decide if the consistent lean is a real (if small) effect. _table to be updated._
+
+---
+
 ## What to try next
 
 ### High priority
