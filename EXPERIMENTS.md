@@ -518,7 +518,20 @@ B beat A in only 2/4 seeds; mean Δ ≈ 0 (range −1.3 to +1.8pp), all within ~
 
 **Result (seed 42, PA+LDN, 309 held-out error cases):** A (InfoNCE) best errR@1 **0.841** → B (+ rank margin) **0.848** (**+0.6pp**). B ≥ A in **all 8 epochs** (every rank-on epoch positive) — consistently right-direction, unlike exp24-local's coin-flip — but the magnitude is within 1 SE (~2.1pp at n=309), so **not confirmed on one seed**. Baseline climbs 0.71→0.84 (references teach the pattern), and the margin term (`margin=0.2, λ=1.0`) goes silent once `correct > confuser + 0.2` — likely too gentle.
 
-**Status:** the insight is now usable infrastructure (rank-aware dataset + sensitive eval + pairwise trainer). Multi-seed confirmation + a `margin`/`λ` sweep in progress to decide if the consistent lean is a real (if small) effect. _table to be updated._
+**Multi-seed confirmation (4 seeds, best error-case R@1):**
+| seed | A | B | Δ |
+|------|------|------|------|
+| 42 | 0.841 | 0.848 | +0.6pp |
+| 1  | 0.803 | 0.803 | +0.0pp |
+| 7  | 0.848 | 0.848 | +0.0pp |
+| 13 | 0.838 | 0.838 | +0.0pp |
+| **mean** | | | **+0.2pp** |
+
+**Verdict: no effect.** B == A *exactly* on 3 of 4 seeds; only seed 42 nudged +0.6pp (within 1 SE). The seed-42 "consistent lean" was noise. Even precisely-mined, rank-aware hard negatives on a sensitive error-case metric give ~0 improvement — same as the flat approach (exp24-local, +0.1pp). (The `margin`/`λ` sweep didn't complete — the Mac degraded to >3 h/epoch after a multi-day session — but with the base effect at exactly 0 on 3/4 seeds, tuning the term's strength is very unlikely to rescue it.)
+
+**Why (the key learning):** the rank data records what the **production** model (exp20/21) got wrong. We train a **new** model with a different embedding space, so *its* confusions differ — the mined hard negatives aren't actually hard for the model being trained. **Verify-UI hard negatives are stale the moment the model changes.**
+
+**Conclusion:** shelve verify-UI hard negatives (flat *and* rank-aware). The local harness earned its keep — it caught two dead ends cheaply, before any Colab/Modal spend. Next real model win is **exp24 proper** (InfoNCE + fine-tuned backbone, *no* hard negs) on Modal, plus the roadmap levers (more PA labels, more unfrozen blocks, DINOv2-base).
 
 ---
 
